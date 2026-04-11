@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Generated pipeline outputs
+pipeline_state/logs/
+pipeline_state/cache/
+pipeline_state/registry/
+
+# Media folders
+photos/
+organized/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
