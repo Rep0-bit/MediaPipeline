@@ -22,3 +22,7 @@ scripts_old/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Generated Ollama enrichment outputs
+pipeline_state/semantics/
+pipeline_state/links/
