@@ -18,6 +18,40 @@ DEFAULT_SUMMARY_JSON = Path(r"C:\Tools\MediaPipeline\pipeline_state\semantics\cl
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
+GENERIC_EVENT_NAMES = {
+    "evento",
+    "eventos",
+    "imagem",
+    "imagens",
+    "captura",
+    "captura de imagem",
+    "captura de imagens",
+    "captura de evento",
+    "evento de imagens",
+    "fotografias",
+    "fotos",
+    "fotografias de evento",
+    "nota",
+    "notas",
+    "relatorio",
+    "relatorio diario",
+    "codigo qr",
+    "qrcode",
+    "reuniao",
+    "reuniao diaria",
+    "reuniao de equipa",
+    "reuniao de staff",
+    "evento digital",
+    "evento semanal",
+    "evento outdoor",
+    "evento desportivo",
+    "viagem",
+    "compras",
+    "compras online",
+    "teste de camera",
+    "imagem de teste",
+}
+
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -46,6 +80,12 @@ def now_utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def normalize_text(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    return value.lower().strip()
+
+
 def sanitize_label(value: str) -> str:
     value = unicodedata.normalize("NFKD", value)
     value = "".join(ch for ch in value if not unicodedata.combining(ch))
@@ -53,6 +93,99 @@ def sanitize_label(value: str) -> str:
     value = re.sub(r"[^a-z0-9]+", "_", value)
     value = re.sub(r"_+", "_", value).strip("_")
     return value[:60] if value else "evento"
+
+
+def is_generic_event_name(value: str) -> bool:
+    norm = normalize_text(value)
+    if not norm:
+        return True
+    if norm in GENERIC_EVENT_NAMES:
+        return True
+
+    generic_patterns = [
+        r"^evento(?:-\d+)?$",
+        r"^imagem(?: de teste)?$",
+        r"^captura(?: de imagens?)?$",
+        r"^captura de evento$",
+        r"^fotografias?(?: de evento)?$",
+        r"^reuniao(?: diaria)?$",
+        r"^notas?$",
+    ]
+    for pattern in generic_patterns:
+        if re.fullmatch(pattern, norm):
+            return True
+
+    return False
+
+
+def title_pt(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return value
+    return value[0].upper() + value[1:]
+
+
+def choose_specific_terms(tags: list[str]) -> list[str]:
+    weak_terms = {
+        "evento", "eventos", "imagem", "imagens", "foto", "fotos",
+        "captura", "notas", "reuniao", "reunião", "formal",
+        "digital", "diario", "diário"
+    }
+    chosen: list[str] = []
+    for tag in tags:
+        clean = tag.strip()
+        norm = normalize_text(clean)
+        if not clean:
+            continue
+        if norm in weak_terms:
+            continue
+        if len(norm) < 3:
+            continue
+        chosen.append(clean)
+        if len(chosen) >= 2:
+            break
+    return chosen
+
+
+def improve_event_name(
+    event_name: str,
+    tags: list[str],
+    description: str,
+    location_hint: str,
+) -> str:
+    if not is_generic_event_name(event_name):
+        return event_name.strip()
+
+    specific_tags = choose_specific_terms(tags)
+
+    loc = location_hint.strip()
+    desc = description.strip()
+
+    if specific_tags and loc:
+        return title_pt(f"{specific_tags[0]} em {loc}")
+
+    if len(specific_tags) >= 2:
+        return title_pt(f"{specific_tags[0]} e {specific_tags[1]}")
+
+    if specific_tags:
+        return title_pt(specific_tags[0])
+
+    if loc:
+        generic_loc_map = {
+            "interior": "Atividade em interior",
+            "exterior": "Atividade em exterior",
+        }
+        loc_norm = normalize_text(loc)
+        if loc_norm in generic_loc_map:
+            return generic_loc_map[loc_norm]
+        return title_pt(f"Atividade em {loc}")
+
+    if desc:
+        first_sentence = re.split(r"[.!?]", desc)[0].strip()
+        if first_sentence:
+            return title_pt(first_sentence[:80])
+
+    return "Evento não específico"
 
 
 def load_clusters(path: Path) -> list[dict[str, Any]]:
@@ -132,16 +265,45 @@ def build_prompt(cluster: dict[str, Any], sampled_paths: list[str], vision: bool
 
     sampled_text = "\n".join(f"- {Path(p).name}" for p in sampled_paths) if sampled_paths else "- no sampled images"
 
+    forbidden_names = (
+        "Evento, Eventos, Imagem, Imagens, Captura, Captura de Imagens, "
+        "Fotografias, Fotos, Notas, Relatório, Código QR, Reunião, "
+        "Reunião Diária, Evento Digital"
+    )
+
     if english_mode:
-        if vision:
-            return f"""
+        return f"""
 You are a local media-organising assistant.
 Analyse ONE daily cluster only. Do not merge different days. Do not guess private identities.
 
 Return JSON only.
-Use short, neutral labels.
-Prefer safe, generic wording if uncertain.
-Return strings in Portuguese (Portugal).
+All output strings must be in Portuguese (Portugal).
+
+Critical naming rules:
+- event_name_suggestion must be specific and concrete
+- use 2 to 6 words
+- prefer scene + activity + place type when possible
+- avoid generic names completely
+
+Forbidden generic names:
+{forbidden_names}
+
+Good examples:
+- Reunião em sala
+- Visita a showroom
+- Exposição de mobiliário
+- Atividade na piscina
+- Trabalhos de construção exterior
+
+Bad examples:
+- Evento
+- Reunião
+- Imagem
+- Captura de Evento
+- Notas
+
+If the image is ambiguous, still choose the most specific safe label possible.
+If certainty is limited, lower semantic_confidence instead of using a generic title.
 
 Cluster data:
 - cluster_id: {cluster["cluster_id"]}
@@ -164,41 +326,39 @@ Required fields:
 - likely_same_event_keywords
 - semantic_confidence
 """.strip()
-        else:
-            return f"""
-You are a local media-organising assistant.
-Analyse ONE daily cluster only. Do not merge different days.
 
-Return JSON only.
-Return strings in Portuguese (Portugal).
-
-Cluster data:
-- cluster_id: {cluster["cluster_id"]}
-- event_day: {cluster["event_day"]}
-- file_count: {cluster["file_count"]}
-- timestamp_start: {cluster["timestamp_start"]}
-- timestamp_end: {cluster["timestamp_end"]}
-
-Sample file names:
-{file_names_text}
-
-Required fields:
-- event_name_suggestion
-- tags
-- short_description
-- location_hint
-- likely_same_event_keywords
-- semantic_confidence
-""".strip()
-
-    if vision:
-        return f"""
+    return f"""
 És um assistente local de organização de media.
 Analisa apenas UM cluster diário. Não juntes dias diferentes. Não uses nomes privados.
 
 Responde apenas em JSON.
 Usa Português de Portugal.
-Se houver incerteza, escolhe um nome genérico e seguro.
+
+Regras críticas para o nome do evento:
+- `event_name_suggestion` deve ser específico e concreto
+- usar entre 2 e 6 palavras
+- preferir contexto visual + atividade + tipo de local, quando possível
+- evitar completamente nomes genéricos
+
+Nomes genéricos proibidos:
+{forbidden_names}
+
+Exemplos bons:
+- Reunião em sala
+- Visita a showroom
+- Exposição de mobiliário
+- Atividade na piscina
+- Trabalhos de construção exterior
+
+Exemplos maus:
+- Evento
+- Reunião
+- Imagem
+- Captura de Evento
+- Notas
+
+Se a imagem for ambígua, escolhe mesmo assim o nome mais específico e seguro possível.
+Se houver pouca certeza, reduz `semantic_confidence` em vez de usar um nome genérico.
 
 Dados do cluster:
 - cluster_id: {cluster["cluster_id"]}
@@ -212,32 +372,6 @@ Amostra de ficheiros:
 
 Imagens amostradas:
 {sampled_text}
-
-Campos obrigatórios:
-- event_name_suggestion
-- tags
-- short_description
-- location_hint
-- likely_same_event_keywords
-- semantic_confidence
-""".strip()
-
-    return f"""
-És um assistente local de organização de media.
-Analisa apenas UM cluster diário. Não juntes dias diferentes.
-
-Responde apenas em JSON.
-Usa Português de Portugal.
-
-Dados do cluster:
-- cluster_id: {cluster["cluster_id"]}
-- event_day: {cluster["event_day"]}
-- file_count: {cluster["file_count"]}
-- timestamp_start: {cluster["timestamp_start"]}
-- timestamp_end: {cluster["timestamp_end"]}
-
-Amostra de ficheiros:
-{file_names_text}
 
 Campos obrigatórios:
 - event_name_suggestion
@@ -293,7 +427,10 @@ def main() -> None:
     args = parser.parse_args()
 
     base_url = base_url_from_endpoint(args.endpoint)
-    health = health_check(base_url)
+    try:
+        health = health_check(base_url)
+    except Exception as exc:
+        raise SystemExit(f"Ollama health check failed: {exc}")
 
     clusters = load_clusters(Path(args.clusters))
 
@@ -392,7 +529,7 @@ def main() -> None:
                 print(f"[ERROR] {cluster['cluster_id']} -> {exc}")
                 continue
 
-        event_name = str(parsed.get("event_name_suggestion", "")).strip() or "Evento"
+        raw_event_name = str(parsed.get("event_name_suggestion", "")).strip() or "Evento"
         tags = [str(x).strip() for x in parsed.get("tags", []) if str(x).strip()]
         description = str(parsed.get("short_description", "")).strip()
         location_hint = str(parsed.get("location_hint", "")).strip()
@@ -400,6 +537,13 @@ def main() -> None:
         semantic_confidence = str(parsed.get("semantic_confidence", "low")).strip().lower()
         if semantic_confidence not in {"low", "medium", "high"}:
             semantic_confidence = "low"
+
+        event_name = improve_event_name(
+            event_name=raw_event_name,
+            tags=tags,
+            description=description,
+            location_hint=location_hint,
+        )
 
         row = {
             "generated_at_utc": now_utc(),
@@ -412,6 +556,8 @@ def main() -> None:
             "prompt_basis": prompt_basis,
             "sampled_image_count": len(image_paths),
             "used_fallback": used_fallback,
+            "raw_event_name_suggestion": raw_event_name,
+            "event_name_was_generic": is_generic_event_name(raw_event_name),
             "event_name_suggestion": event_name,
             "event_label_fs": sanitize_label(event_name),
             "tags": tags[:10],
