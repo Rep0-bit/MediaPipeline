@@ -22,6 +22,52 @@ STOPWORDS = {
     "the", "and", "for", "with", "from", "this", "that"
 }
 
+GENERIC_EVENT_NAMES = {
+    "evento",
+    "eventos",
+    "imagem",
+    "imagens",
+    "evento de imagens",
+    "captura de imagens",
+    "captura de imagem",
+    "fotografias de evento",
+    "fotografias",
+    "fotos",
+    "sessao de fotos",
+    "capturas diarias",
+    "captura",
+    "notas",
+    "nota",
+    "relatorio",
+    "relatorio diario",
+    "codigo qr",
+    "qrcode",
+    "reuniao",
+    "reuniao diaria",
+    "reuniao de equipa",
+    "reuniao de staff",
+    "evento digital",
+    "evento semanal",
+    "evento outdoor",
+    "evento desportivo",
+    "recolha de dados",
+    "evento de recolha de dados",
+    "monitoramento de evento",
+    "monitoramento de seguranca",
+    "ambiente interior",
+    "ambiente exterior",
+    "atividade diaria",
+    "atividade de lazer",
+    "atividade ao ar livre",
+    "viagem",
+    "compras",
+    "compras online",
+    "teste de camera",
+    "imagem de teste",
+    "evento-0026",
+    "evento de teste",
+}
+
 
 def normalize_text(value: str) -> str:
     value = unicodedata.normalize("NFKD", value)
@@ -53,6 +99,49 @@ def parse_day(value: str) -> datetime | None:
         return None
 
 
+def is_generic_event_name(value: str) -> bool:
+    norm = normalize_text(value)
+    if not norm:
+        return True
+    if norm in GENERIC_EVENT_NAMES:
+        return True
+
+    # padrões muito genéricos
+    generic_patterns = [
+        r"^evento(?:-\d+)?$",
+        r"^imagem(?: de teste)?$",
+        r"^captura(?: de imagens?)?$",
+        r"^fotografias?(?: de evento)?$",
+        r"^reuniao(?: diaria)?$",
+        r"^notas?$",
+    ]
+    for pattern in generic_patterns:
+        if re.fullmatch(pattern, norm):
+            return True
+
+    return False
+
+
+def pick_best_group_name(member_rows: list[dict[str, Any]]) -> str:
+    non_generic = [
+        row.get("event_name_suggestion", "").strip()
+        for row in member_rows
+        if row.get("event_name_suggestion", "").strip()
+        and not is_generic_event_name(row.get("event_name_suggestion", ""))
+    ]
+    generic = [
+        row.get("event_name_suggestion", "").strip()
+        for row in member_rows
+        if row.get("event_name_suggestion", "").strip()
+    ]
+
+    if non_generic:
+        return Counter(non_generic).most_common(1)[0][0]
+    if generic:
+        return Counter(generic).most_common(1)[0][0]
+    return "Evento multi-dia"
+
+
 def score_pair(a: dict[str, Any], b: dict[str, Any], max_gap_days: int) -> dict[str, Any] | None:
     day_a = parse_day(a["event_day"])
     day_b = parse_day(b["event_day"])
@@ -73,16 +162,38 @@ def score_pair(a: dict[str, Any], b: dict[str, Any], max_gap_days: int) -> dict[
         score += 0.10
         reasons.append("dias próximos")
 
-    name_sim = jaccard(tokenise(a.get("event_name_suggestion", "")), tokenise(b.get("event_name_suggestion", "")))
-    if name_sim >= 0.60:
-        score += 0.25
-        reasons.append("nome sugerido muito semelhante")
-    elif name_sim >= 0.30:
-        score += 0.15
-        reasons.append("nome sugerido parcialmente semelhante")
-    elif name_sim > 0:
-        score += 0.05
-        reasons.append("nome sugerido com alguma sobreposição")
+    name_a = a.get("event_name_suggestion", "")
+    name_b = b.get("event_name_suggestion", "")
+    generic_a = is_generic_event_name(name_a)
+    generic_b = is_generic_event_name(name_b)
+
+    name_sim = jaccard(tokenise(name_a), tokenise(name_b))
+
+    # peso reduzido quando os nomes são genéricos
+    if not generic_a and not generic_b:
+        if name_sim >= 0.60:
+            score += 0.25
+            reasons.append("nome sugerido muito semelhante")
+        elif name_sim >= 0.30:
+            score += 0.15
+            reasons.append("nome sugerido parcialmente semelhante")
+        elif name_sim > 0:
+            score += 0.05
+            reasons.append("nome sugerido com alguma sobreposição")
+    elif generic_a and generic_b:
+        if name_sim >= 0.60:
+            score += 0.05
+            reasons.append("nome genérico semelhante (peso reduzido)")
+        elif name_sim > 0:
+            score += 0.02
+            reasons.append("nome genérico com ligeira sobreposição")
+    else:
+        if name_sim >= 0.60:
+            score += 0.08
+            reasons.append("um nome específico e outro genérico com semelhança")
+        elif name_sim >= 0.30:
+            score += 0.04
+            reasons.append("um nome específico e outro genérico com alguma semelhança")
 
     tags_a = {normalize_text(x) for x in a.get("tags", []) if str(x).strip()}
     tags_b = {normalize_text(x) for x in b.get("tags", []) if str(x).strip()}
@@ -124,6 +235,11 @@ def score_pair(a: dict[str, Any], b: dict[str, Any], max_gap_days: int) -> dict[
         score += conf_bonus
         reasons.append("boa confiança semântica")
 
+    # pequena penalização se ambos os nomes forem genéricos
+    if generic_a and generic_b:
+        score -= 0.05
+        reasons.append("penalização por nomes demasiado genéricos")
+
     confidence = None
     if score >= 0.70:
         confidence = "high"
@@ -133,7 +249,14 @@ def score_pair(a: dict[str, Any], b: dict[str, Any], max_gap_days: int) -> dict[
     if confidence is None:
         return None
 
-    suggested_event_name = a.get("event_name_suggestion") or b.get("event_name_suggestion") or "Evento multi-dia"
+    if not generic_a and not generic_b:
+        suggested_event_name = name_a if len(name_a) >= len(name_b) else name_b
+    elif not generic_a:
+        suggested_event_name = name_a
+    elif not generic_b:
+        suggested_event_name = name_b
+    else:
+        suggested_event_name = name_a or name_b or "Evento multi-dia"
 
     return {
         "cluster_id_a": a["cluster_id"],
@@ -144,6 +267,8 @@ def score_pair(a: dict[str, Any], b: dict[str, Any], max_gap_days: int) -> dict[
         "score": round(score, 3),
         "confidence": confidence,
         "suggested_event_name": suggested_event_name,
+        "generic_name_a": generic_a,
+        "generic_name_b": generic_b,
         "reasons": reasons,
     }
 
@@ -210,10 +335,6 @@ def main() -> None:
             continue
 
         member_rows = [semantics_by_cluster[m] for m in sorted(members)]
-        suggested_names = [r.get("event_name_suggestion", "").strip() for r in member_rows if r.get("event_name_suggestion", "").strip()]
-        name_counter = Counter(suggested_names)
-        suggested_event_name = name_counter.most_common(1)[0][0] if name_counter else "Evento multi-dia"
-
         event_days = sorted({r["event_day"] for r in member_rows})
         group_id = f"multiday-{group_counter:04d}"
         group_counter += 1
@@ -224,7 +345,7 @@ def main() -> None:
                 "confidence": "high",
                 "cluster_ids": [r["cluster_id"] for r in member_rows],
                 "event_days": event_days,
-                "suggested_event_name": suggested_event_name,
+                "suggested_event_name": pick_best_group_name(member_rows),
                 "member_count": len(member_rows),
             }
         )
