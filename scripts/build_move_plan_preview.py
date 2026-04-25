@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
 INPUT_CLUSTERS = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\event_cluster_preview.json")
+INPUT_REGISTRY = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\media_registry_enriched.jsonl")
 
-# Planned organized library root (dry-run only, no files are copied or moved)
 TARGET_ROOT = Path(r"C:\Tools\Immich\organized")
 
 OUTPUT_PLAN_JSON = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_preview.json")
@@ -16,10 +17,28 @@ OUTPUT_PLAN_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_p
 OUTPUT_PLAN_CSV = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_preview.csv")
 OUTPUT_SUMMARY_JSON = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_summary.json")
 
+DOCUMENT_KEYWORDS = {
+    "cartão", "cartao", "cidadão", "cidadao", "cc_", "passport", "passaporte",
+    "nif", "iban", "invoice", "fatura", "receipt", "recibo", "document", "documento",
+    "certificado", "contrato", "apolice", "licença", "licenca", "identidade",
+}
+
+INVALID_EVENT_DAYS = {"missing", "0000-00-00"}
+
 
 def load_clusters(path: Path) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def load_registry(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
 
 
 def safe_folder_part(value: str) -> str:
@@ -27,36 +46,115 @@ def safe_folder_part(value: str) -> str:
     for ch in value:
         if ch.isalnum() or ch in ("-", "_"):
             allowed.append(ch)
-        elif ch in (" ",):
+        elif ch == " ":
             allowed.append("_")
     cleaned = "".join(allowed).strip("_")
     return cleaned or "unknown"
 
 
-def folder_name_for_cluster(event_day: str, day_sequence: int) -> tuple[str, str]:
-    """
-    Returns:
-      year_folder: YYYY
-      day_folder:  MM-DD or MM-DD_02
-    """
-    if event_day == "missing":
-        year_folder = "unknown"
-        base = "unknown-date"
-    else:
-        year_folder = event_day[:4]
-        month_day = event_day[5:]  # MM-DD
-        base = month_day
+def duplicate_penalty(file_name: str) -> tuple[int, int, str]:
+    lower = file_name.lower()
+    stem = Path(file_name).stem.lower()
+    penalty = 0
 
-    if day_sequence == 1:
-        return year_folder, safe_folder_part(base)
+    if "__dup" in lower:
+        penalty += 100
+    if " copy" in lower or "_copy" in lower:
+        penalty += 50
+    if re.search(r" \d+$", stem):
+        penalty += 20
+    if re.search(r"\(\d+\)$", stem):
+        penalty += 20
 
-    return year_folder, safe_folder_part(f"{base}_{day_sequence:02d}")
+    return (penalty, len(file_name), lower)
+
+
+def choose_primary_duplicate(file_records: list[dict[str, Any]]) -> str:
+    best = min(file_records, key=lambda r: duplicate_penalty(r["file_name"]))
+    return best["file_path"]
+
+
+def build_duplicate_info(registry_rows: list[dict[str, Any]]) -> tuple[dict[str, str], set[str]]:
+    by_hash: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in registry_rows:
+        by_hash[row["hash_sha256"]].append(row)
+
+    primary_by_path: dict[str, str] = {}
+    secondary_paths: set[str] = set()
+
+    for _, group in by_hash.items():
+        if len(group) <= 1:
+            continue
+        primary_path = choose_primary_duplicate(group)
+        for row in group:
+            primary_by_path[row["file_path"]] = primary_path
+            if row["file_path"] != primary_path:
+                secondary_paths.add(row["file_path"])
+
+    return primary_by_path, secondary_paths
+
+
+def is_document_file(file_name: str) -> bool:
+    lower = file_name.lower()
+    return any(keyword in lower for keyword in DOCUMENT_KEYWORDS)
+
+
+def cluster_day_sequence_map(clusters: list[dict[str, Any]]) -> dict[str, int]:
+    per_day_seen: dict[str, list[str]] = defaultdict(list)
+
+    for cluster in clusters:
+        event_day = cluster.get("event_day", "missing")
+        cluster_id = cluster["cluster_id"]
+        if cluster_id not in per_day_seen[event_day]:
+            per_day_seen[event_day].append(cluster_id)
+
+    mapping: dict[str, int] = {}
+    for _, cluster_ids in per_day_seen.items():
+        for idx, cluster_id in enumerate(cluster_ids, start=1):
+            mapping[cluster_id] = idx
+
+    return mapping
+
+
+def cluster_count_per_day(clusters: list[dict[str, Any]]) -> dict[str, int]:
+    counter: Counter = Counter()
+    for cluster in clusters:
+        counter[cluster.get("event_day", "missing")] += 1
+    return dict(counter)
+
+
+def should_auto_cluster(cluster: dict[str, Any], day_cluster_count: int) -> bool:
+    event_day = cluster.get("event_day", "missing")
+    confidence = cluster.get("cluster_confidence", "low")
+    file_count = int(cluster.get("file_count", 0))
+
+    if event_day in INVALID_EVENT_DAYS:
+        return False
+
+    if confidence == "high":
+        return True
+
+    if confidence == "medium" and file_count >= 3 and day_cluster_count == 1:
+        return True
+
+    return False
+
+
+def build_auto_folder(event_day: str, cluster_id: str, cluster_day_seq: dict[str, int]) -> Path:
+    year = event_day[:4]
+    month_day = event_day[5:]
+    seq = cluster_day_seq.get(cluster_id, 1)
+
+    folder_name = month_day if seq == 1 else f"{month_day}_{seq:02d}"
+    return TARGET_ROOT / year / folder_name
 
 
 def propose_destination(folder_root: Path, file_name: str, used_paths: set[str]) -> str:
     candidate = folder_root / file_name
-    if str(candidate).lower() not in used_paths:
-        used_paths.add(str(candidate).lower())
+    candidate_key = str(candidate).lower()
+
+    if candidate_key not in used_paths:
+        used_paths.add(candidate_key)
         return str(candidate)
 
     stem = Path(file_name).stem
@@ -65,85 +163,110 @@ def propose_destination(folder_root: Path, file_name: str, used_paths: set[str])
 
     while True:
         candidate = folder_root / f"{stem}__dup{counter:02d}{suffix}"
-        if str(candidate).lower() not in used_paths:
-            used_paths.add(str(candidate).lower())
+        candidate_key = str(candidate).lower()
+        if candidate_key not in used_paths:
+            used_paths.add(candidate_key)
             return str(candidate)
         counter += 1
 
 
-def review_recommended(cluster: dict[str, Any]) -> bool:
-    if cluster.get("cluster_confidence") != "high":
-        return True
-
-    for file_record in cluster.get("files", []):
-        if file_record.get("effective_timestamp_precision") != "second":
-            return True
-
-    return False
-
-
 def main() -> None:
     clusters = load_clusters(INPUT_CLUSTERS)
+    registry_rows = load_registry(INPUT_REGISTRY)
 
-    day_sequence_counter: dict[str, int] = defaultdict(int)
-    move_plan: list[dict[str, Any]] = []
+    registry_by_path = {row["file_path"]: row for row in registry_rows}
+    _, secondary_duplicate_paths = build_duplicate_info(registry_rows)
+
+    day_cluster_counts = cluster_count_per_day(clusters)
+    cluster_day_seq = cluster_day_sequence_map(clusters)
+
     used_destination_paths: set[str] = set()
+    move_plan: list[dict[str, Any]] = []
 
-    cluster_count_by_confidence = Counter()
-    file_count_by_confidence = Counter()
+    counters = Counter()
 
     for cluster in clusters:
+        cluster_id = cluster["cluster_id"]
         event_day = cluster.get("event_day", "missing")
-        day_sequence_counter[event_day] += 1
-        day_sequence = day_sequence_counter[event_day]
-
-        year_folder, day_folder = folder_name_for_cluster(event_day, day_sequence)
-        target_folder = TARGET_ROOT / year_folder / day_folder
-
         cluster_confidence = cluster.get("cluster_confidence", "low")
-        cluster_count_by_confidence[cluster_confidence] += 1
-        file_count_by_confidence[cluster_confidence] += cluster.get("file_count", 0)
+        file_count = int(cluster.get("file_count", 0))
+        day_count = day_cluster_counts.get(event_day, 1)
+
+        cluster_auto = should_auto_cluster(cluster, day_count)
 
         for file_record in cluster.get("files", []):
-            source_path = file_record["file_path"]
+            file_path = file_record["file_path"]
             file_name = file_record["file_name"]
+            registry_row = registry_by_path.get(file_path)
+
+            is_document = is_document_file(file_name)
+            is_duplicate_secondary = file_path in secondary_duplicate_paths
+
+            if is_document:
+                proposed_bucket = "general"
+                proposed_action = "general_document"
+                proposed_folder = TARGET_ROOT / "_GENERAL" / "_DOCUMENTS" / safe_folder_part(cluster_id)
+            elif is_duplicate_secondary:
+                proposed_bucket = "general"
+                proposed_action = "general_duplicate"
+                proposed_folder = TARGET_ROOT / "_GENERAL" / "_DUPLICATES" / safe_folder_part(cluster_id)
+            elif event_day in INVALID_EVENT_DAYS:
+                proposed_bucket = "general"
+                proposed_action = "general_unsorted"
+                proposed_folder = TARGET_ROOT / "_GENERAL" / "_UNSORTED" / safe_folder_part(cluster_id)
+            elif cluster_auto:
+                proposed_bucket = "auto"
+                proposed_action = "auto"
+                proposed_folder = build_auto_folder(event_day, cluster_id, cluster_day_seq)
+            else:
+                proposed_bucket = "review"
+                proposed_action = "review"
+                proposed_folder = TARGET_ROOT / "_REVIEW" / f"{event_day}_{cluster_id}"
 
             proposed_destination = propose_destination(
-                folder_root=target_folder,
+                folder_root=proposed_folder,
                 file_name=file_name,
                 used_paths=used_destination_paths,
             )
 
-            move_plan.append(
-                {
-                    "cluster_id": cluster["cluster_id"],
-                    "event_day": event_day,
-                    "cluster_confidence": cluster_confidence,
-                    "review_recommended": review_recommended(cluster),
-                    "timestamp_start": cluster.get("timestamp_start"),
-                    "timestamp_end": cluster.get("timestamp_end"),
-                    "proposed_action": "copy",
-                    "source_path": source_path,
-                    "proposed_folder": str(target_folder),
-                    "proposed_destination": proposed_destination,
-                    "file_name": file_name,
-                    "effective_timestamp": file_record.get("effective_timestamp"),
-                    "effective_timestamp_source": file_record.get("effective_timestamp_source"),
-                    "effective_timestamp_confidence": file_record.get("effective_timestamp_confidence"),
-                    "effective_timestamp_precision": file_record.get("effective_timestamp_precision"),
-                }
-            )
+            review_recommended = proposed_bucket == "review"
+
+            row = {
+                "cluster_id": cluster_id,
+                "event_day": event_day,
+                "cluster_confidence": cluster_confidence,
+                "cluster_file_count": file_count,
+                "day_cluster_count": day_count,
+                "review_recommended": review_recommended,
+                "proposed_bucket": proposed_bucket,
+                "proposed_action": proposed_action,
+                "timestamp_start": cluster.get("timestamp_start"),
+                "timestamp_end": cluster.get("timestamp_end"),
+                "source_path": file_path,
+                "proposed_folder": str(proposed_folder),
+                "proposed_destination": proposed_destination,
+                "file_name": file_name,
+                "effective_timestamp": file_record.get("effective_timestamp"),
+                "effective_timestamp_source": file_record.get("effective_timestamp_source"),
+                "effective_timestamp_confidence": file_record.get("effective_timestamp_confidence"),
+                "effective_timestamp_precision": file_record.get("effective_timestamp_precision"),
+                "is_document": is_document,
+                "is_duplicate_secondary": is_duplicate_secondary,
+                "hash_sha256": registry_row.get("hash_sha256") if registry_row else None,
+            }
+
+            move_plan.append(row)
+            counters[f"bucket_{proposed_bucket}"] += 1
+            counters[f"action_{proposed_action}"] += 1
 
     summary = {
         "total_clusters": len(clusters),
         "total_files": len(move_plan),
         "target_root": str(TARGET_ROOT),
-        "cluster_count_by_confidence": dict(cluster_count_by_confidence),
-        "file_count_by_confidence": dict(file_count_by_confidence),
-        "review_recommended_cluster_count": sum(
-            1 for cluster in clusters if review_recommended(cluster)
-        ),
-        "day_sequence_counter": dict(day_sequence_counter),
+        "result_counters": dict(counters),
+        "auto_cluster_count": len({r["cluster_id"] for r in move_plan if r["proposed_bucket"] == "auto"}),
+        "review_cluster_count": len({r["cluster_id"] for r in move_plan if r["proposed_bucket"] == "review"}),
+        "general_cluster_count": len({r["cluster_id"] for r in move_plan if r["proposed_bucket"] == "general"}),
     }
 
     OUTPUT_PLAN_JSON.parent.mkdir(parents=True, exist_ok=True)
@@ -165,10 +288,13 @@ def main() -> None:
                 "cluster_id",
                 "event_day",
                 "cluster_confidence",
+                "cluster_file_count",
+                "day_cluster_count",
                 "review_recommended",
+                "proposed_bucket",
+                "proposed_action",
                 "timestamp_start",
                 "timestamp_end",
-                "proposed_action",
                 "source_path",
                 "proposed_folder",
                 "proposed_destination",
@@ -177,6 +303,9 @@ def main() -> None:
                 "effective_timestamp_source",
                 "effective_timestamp_confidence",
                 "effective_timestamp_precision",
+                "is_document",
+                "is_duplicate_secondary",
+                "hash_sha256",
             ],
         )
         writer.writeheader()

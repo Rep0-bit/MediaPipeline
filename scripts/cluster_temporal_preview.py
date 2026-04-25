@@ -13,7 +13,6 @@ OUTPUT_ENRICHED_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\me
 OUTPUT_CLUSTER_JSON = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\event_cluster_preview.json")
 OUTPUT_CLUSTER_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\event_cluster_preview.jsonl")
 
-# Split thresholds
 HIGH_CONF_GAP_HOURS = 4
 MEDIUM_CONF_GAP_HOURS = 8
 LOW_CONF_GAP_HOURS = 12
@@ -37,13 +36,22 @@ def load_records(path: Path) -> list[dict[str, Any]]:
     return records
 
 
-def parse_exif_datetime(value: str | None) -> datetime | None:
+def is_zero_datetime_string(value: str | None) -> bool:
     if not value:
+        return False
+    normalized = value.strip()
+    return normalized.startswith("0000:00:00") or normalized.startswith("0000-00-00")
+
+
+def parse_exif_datetime(value: str | None) -> datetime | None:
+    if not value or is_zero_datetime_string(value):
         return None
 
     formats = [
         "%Y:%m:%d %H:%M:%S%z",
         "%Y:%m:%d %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S%z",
+        "%Y-%m-%d %H:%M:%S",
     ]
 
     for fmt in formats:
@@ -61,27 +69,56 @@ def parse_exif_datetime(value: str | None) -> datetime | None:
 def parse_filename_timestamp(filename: str) -> tuple[datetime | None, str | None]:
     stem = Path(filename).stem
 
-    # Example: IMG20251009184636.jpg
-    m = re.search(r"(\d{8})(\d{6})", stem)
-    if m:
-        date_part = m.group(1)
-        time_part = m.group(2)
+    patterns_datetime = [
+        r"(?<!\d)(\d{8})(\d{6})(?!\d)",              # IMG20240718120904
+        r"(?<!\d)(\d{8})_(\d{6})(?!\d)",             # IMG_20201023_184331
+        r"(?<!\d)(\d{4})-(\d{2})-(\d{2})[-_](\d{2})-(\d{2})-(\d{2})(?!\d)",  # Screenshot_2024-07-19-20-39-21
+    ]
+
+    for pattern in patterns_datetime:
+        match = re.search(pattern, stem)
+        if not match:
+            continue
+
+        groups = match.groups()
+
         try:
-            dt = datetime.strptime(date_part + time_part, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
-            return dt, "second"
+            if len(groups) == 2:
+                date_part, time_part = groups
+                dt = datetime.strptime(date_part + time_part, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+                return dt, "second"
+
+            if len(groups) == 6:
+                yyyy, mm, dd, hh, mi, ss = groups
+                dt = datetime(
+                    int(yyyy), int(mm), int(dd), int(hh), int(mi), int(ss), tzinfo=timezone.utc
+                )
+                return dt, "second"
         except ValueError:
             pass
 
-    # Example: IMG-20250424-WA0009.jpg
-    m = re.search(r"(\d{8})", stem)
-    if m:
-        date_part = m.group(1)
+    patterns_date = [
+        r"(?<!\d)(\d{8})(?!\d)",                     # IMG-20240718-WA0004
+        r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)",    # screenshot names / other exports
+    ]
+
+    for pattern in patterns_date:
+        match = re.search(pattern, stem)
+        if not match:
+            continue
+
+        groups = match.groups()
         try:
-            # Use midday only as a stable sort key for date-only files
-            dt = datetime.strptime(date_part, "%Y%m%d").replace(
-                hour=12, minute=0, second=0, tzinfo=timezone.utc
-            )
-            return dt, "date"
+            if len(groups) == 1:
+                dt = datetime.strptime(groups[0], "%Y%m%d").replace(
+                    hour=12, minute=0, second=0, tzinfo=timezone.utc
+                )
+                return dt, "date"
+
+            if len(groups) == 3:
+                yyyy, mm, dd = groups
+                dt = datetime(int(yyyy), int(mm), int(dd), 12, 0, 0, tzinfo=timezone.utc)
+                return dt, "date"
         except ValueError:
             pass
 
@@ -95,6 +132,7 @@ def derive_effective_timestamp(record: dict[str, Any]) -> EffectiveTimestamp:
     created_at_is_embedded = bool(exif.get("created_at_is_embedded"))
 
     exif_dt = parse_exif_datetime(created_at)
+
     if exif_dt and created_at_is_embedded:
         return EffectiveTimestamp(
             value=exif_dt,
@@ -166,15 +204,12 @@ def should_split_cluster(prev: dict[str, Any], curr: dict[str, Any]) -> bool:
     if prev_dt is None or curr_dt is None:
         return True
 
-    prev_day = prev_dt.date()
-    curr_day = curr_dt.date()
-    if prev_day != curr_day:
+    if prev_dt.date() != curr_dt.date():
         return True
 
     prev_precision = prev["effective_timestamp_precision"]
     curr_precision = curr["effective_timestamp_precision"]
 
-    # If one of the files only has date-level precision, keep same-day grouping.
     if prev_precision == "date" or curr_precision == "date":
         return False
 
@@ -245,13 +280,10 @@ def main() -> None:
         enriched["effective_timestamp_source"] = eff.source
         enriched["effective_timestamp_confidence"] = eff.confidence
         enriched["effective_timestamp_precision"] = eff.precision
-
-        # Internal helper field for clustering, removed before writing
         enriched["effective_timestamp_dt"] = eff.value
 
         enriched_records.append(enriched)
 
-    # Sort for deterministic clustering
     enriched_records.sort(
         key=lambda r: (
             derive_event_day(r["effective_timestamp_dt"]),
@@ -285,7 +317,6 @@ def main() -> None:
             item["cluster_id"] = cluster_id
         cluster_summaries.append(make_cluster_summary(cluster_id, cluster))
 
-    # Write enriched registry without helper datetime objects
     OUTPUT_ENRICHED_JSONL.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_ENRICHED_JSONL.open("w", encoding="utf-8") as f:
         for record in enriched_records:

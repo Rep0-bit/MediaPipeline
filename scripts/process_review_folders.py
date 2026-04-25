@@ -4,7 +4,7 @@ import argparse
 import json
 import re
 import shutil
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,16 +12,18 @@ from typing import Any
 
 DEFAULT_REVIEW_ROOT = Path(r"C:\Tools\Immich\organized\_REVIEW")
 DEFAULT_GENERAL_ROOT = Path(r"C:\Tools\Immich\organized\_GENERAL")
-DEFAULT_PLAN_PATH = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_preview.jsonl")
+DEFAULT_CLUSTERS_PATH = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\event_cluster_preview.json")
 DEFAULT_LOG_PATH = Path(r"C:\Tools\MediaPipeline\pipeline_state\logs\process_review_folders.log")
 DEFAULT_SUMMARY_PATH = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\process_review_folders_summary.json")
+DEFAULT_TARGET_ROOT = Path(r"C:\Tools\Immich\organized")
 
 
 @dataclass
 class Config:
     review_root: Path
     general_root: Path
-    plan_path: Path
+    clusters_path: Path
+    target_root: Path
     log_path: Path
     summary_path: Path
     execute: bool
@@ -39,45 +41,12 @@ def log_line(path: Path, message: str) -> None:
         f.write(line + "\n")
 
 
-def load_move_plan(path: Path) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+def load_clusters(path: Path) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
-
-
-def build_cluster_destination_map(rows: list[dict[str, Any]]) -> dict[str, Path]:
-    mapping: dict[str, Path] = {}
-    conflicts: dict[str, set[str]] = {}
-
-    for row in rows:
-        cluster_id = row["cluster_id"]
-        proposed_folder = row["proposed_folder"]
-
-        if cluster_id not in mapping:
-            mapping[cluster_id] = Path(proposed_folder)
-            conflicts[cluster_id] = {proposed_folder}
-        else:
-            conflicts[cluster_id].add(proposed_folder)
-
-    bad = {cid: vals for cid, vals in conflicts.items() if len(vals) > 1}
-    if bad:
-        raise ValueError(f"Clusters com mais de um proposed_folder: {bad}")
-
-    return mapping
+        return json.load(f)
 
 
 def parse_review_folder_name(folder_name: str) -> tuple[str, str] | None:
-    """
-    Espera nomes como:
-      2025-09-24_event-0007_A
-      2025-09-24_event-0007_G
-    Retorna:
-      (base_name, decision)
-    """
     match = re.match(r"^(?P<base>.+)_(?P<decision>[AG])$", folder_name)
     if not match:
         return None
@@ -89,6 +58,37 @@ def extract_cluster_id(base_name: str) -> str | None:
     if not match:
         return None
     return match.group(1)
+
+
+def cluster_day_sequence_map(clusters: list[dict[str, Any]]) -> tuple[dict[str, str], dict[str, int]]:
+    cluster_day: dict[str, str] = {}
+    per_day_seen: dict[str, list[str]] = defaultdict(list)
+
+    for cluster in clusters:
+        cluster_id = cluster["cluster_id"]
+        event_day = cluster.get("event_day", "missing")
+        cluster_day[cluster_id] = event_day
+        if cluster_id not in per_day_seen[event_day]:
+            per_day_seen[event_day].append(cluster_id)
+
+    cluster_day_seq: dict[str, int] = {}
+    for _, cluster_ids in per_day_seen.items():
+        for idx, cluster_id in enumerate(cluster_ids, start=1):
+            cluster_day_seq[cluster_id] = idx
+
+    return cluster_day, cluster_day_seq
+
+
+def build_auto_folder(target_root: Path, event_day: str, cluster_id: str, cluster_day_seq: dict[str, int]) -> Path:
+    if event_day == "missing":
+        return target_root / "_GENERAL" / "_UNSORTED" / cluster_id
+
+    year = event_day[:4]
+    month_day = event_day[5:]
+    seq = cluster_day_seq.get(cluster_id, 1)
+
+    folder_name = month_day if seq == 1 else f"{month_day}_{seq:02d}"
+    return target_root / year / folder_name
 
 
 def classify_existing(source: Path, destination: Path) -> str:
@@ -103,13 +103,7 @@ def classify_existing(source: Path, destination: Path) -> str:
         return "exists_unknown"
 
 
-def resolve_destination_with_suffix(source: Path, destination: Path) -> Path:
-    status = classify_existing(source, destination)
-    if status == "missing":
-        return destination
-    if status == "exists_same_size":
-        return destination
-
+def resolve_destination_with_suffix(destination: Path) -> Path:
     stem = destination.stem
     suffix = destination.suffix
     counter = 2
@@ -128,7 +122,9 @@ def move_file(source: Path, destination: Path, execute: bool) -> str:
     if existing_status == "exists_same_size":
         return f"skipped_existing -> {destination}"
 
-    final_destination = resolve_destination_with_suffix(source, destination)
+    final_destination = destination
+    if existing_status in {"exists_conflict", "exists_unknown"}:
+        final_destination = resolve_destination_with_suffix(destination)
 
     if not execute:
         return f"dry_run_move -> {final_destination}"
@@ -137,21 +133,34 @@ def move_file(source: Path, destination: Path, execute: bool) -> str:
     return f"moved -> {final_destination}"
 
 
-def remove_folder_if_empty(folder: Path, execute: bool) -> str:
-    try:
-        next(folder.iterdir())
-        return "not_empty"
-    except StopIteration:
-        if execute:
-            folder.rmdir()
-            return "removed_empty_folder"
-        return "dry_run_remove_empty_folder"
-    except FileNotFoundError:
-        return "already_missing"
-
-
 def iter_files(folder: Path) -> list[Path]:
     return [p for p in folder.rglob("*") if p.is_file()]
+
+
+def remove_empty_dirs_bottom_up(root: Path, execute: bool) -> list[str]:
+    results: list[str] = []
+    for folder in sorted([p for p in root.rglob("*") if p.is_dir()], key=lambda p: len(p.parts), reverse=True):
+        try:
+            next(folder.iterdir())
+        except StopIteration:
+            if execute:
+                folder.rmdir()
+                results.append(f"removed_empty_folder -> {folder}")
+            else:
+                results.append(f"dry_run_remove_empty_folder -> {folder}")
+        except (FileNotFoundError, StopIteration):
+            continue
+
+    try:
+        next(root.iterdir())
+    except StopIteration:
+        if execute:
+            root.rmdir()
+            results.append(f"removed_empty_folder -> {root}")
+        else:
+            results.append(f"dry_run_remove_empty_folder -> {root}")
+
+    return results
 
 
 def main() -> None:
@@ -160,20 +169,18 @@ def main() -> None:
     )
     parser.add_argument("--review-root", default=str(DEFAULT_REVIEW_ROOT))
     parser.add_argument("--general-root", default=str(DEFAULT_GENERAL_ROOT))
-    parser.add_argument("--plan", default=str(DEFAULT_PLAN_PATH))
+    parser.add_argument("--clusters", default=str(DEFAULT_CLUSTERS_PATH))
+    parser.add_argument("--target-root", default=str(DEFAULT_TARGET_ROOT))
     parser.add_argument("--log", default=str(DEFAULT_LOG_PATH))
     parser.add_argument("--summary", default=str(DEFAULT_SUMMARY_PATH))
-    parser.add_argument(
-        "--execute",
-        action="store_true",
-        help="Executa movimentos reais. Sem este flag, corre em dry-run.",
-    )
+    parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
 
     cfg = Config(
         review_root=Path(args.review_root),
         general_root=Path(args.general_root),
-        plan_path=Path(args.plan),
+        clusters_path=Path(args.clusters),
+        target_root=Path(args.target_root),
         log_path=Path(args.log),
         summary_path=Path(args.summary),
         execute=bool(args.execute),
@@ -181,11 +188,11 @@ def main() -> None:
 
     if not cfg.review_root.exists():
         raise FileNotFoundError(f"_REVIEW não encontrado: {cfg.review_root}")
-    if not cfg.plan_path.exists():
-        raise FileNotFoundError(f"Plano não encontrado: {cfg.plan_path}")
+    if not cfg.clusters_path.exists():
+        raise FileNotFoundError(f"Clusters file não encontrado: {cfg.clusters_path}")
 
-    rows = load_move_plan(cfg.plan_path)
-    cluster_destination_map = build_cluster_destination_map(rows)
+    clusters = load_clusters(cfg.clusters_path)
+    cluster_day, cluster_day_seq = cluster_day_sequence_map(clusters)
 
     counters = Counter()
     decisions_found: list[dict[str, Any]] = []
@@ -207,16 +214,11 @@ def main() -> None:
             log_line(cfg.log_path, f"IGNORE_NO_CLUSTER_ID | {folder}")
             continue
 
+        event_day = cluster_day.get(cluster_id, "missing")
         files = iter_files(folder)
-        counters["decision_folders"] += 1
-        counters[f"decision_{decision}"] += 1
 
         if decision == "A":
-            target_folder = cluster_destination_map.get(cluster_id)
-            if target_folder is None:
-                counters["approve_missing_plan_target"] += 1
-                log_line(cfg.log_path, f"APPROVE_MISSING_TARGET | {folder} | cluster_id={cluster_id}")
-                continue
+            target_folder = build_auto_folder(cfg.target_root, event_day, cluster_id, cluster_day_seq)
         elif decision == "G":
             target_folder = cfg.general_root / base_name
         else:
@@ -224,15 +226,20 @@ def main() -> None:
             log_line(cfg.log_path, f"IGNORE_UNKNOWN_DECISION | {folder}")
             continue
 
-        decision_record = {
-            "review_folder": str(folder),
-            "base_name": base_name,
-            "decision": decision,
-            "cluster_id": cluster_id,
-            "target_folder": str(target_folder),
-            "file_count": len(files),
-        }
-        decisions_found.append(decision_record)
+        counters["decision_folders"] += 1
+        counters[f"decision_{decision}"] += 1
+
+        decisions_found.append(
+            {
+                "review_folder": str(folder),
+                "base_name": base_name,
+                "decision": decision,
+                "cluster_id": cluster_id,
+                "event_day": event_day,
+                "target_folder": str(target_folder),
+                "file_count": len(files),
+            }
+        )
 
         for source_file in files:
             destination_file = target_folder / source_file.name
@@ -245,21 +252,20 @@ def main() -> None:
             elif result.startswith("skipped_existing"):
                 counters["files_skipped_existing"] += 1
 
-            log_line(
-                cfg.log_path,
-                f"{'APPROVE' if decision == 'A' else 'GENERAL'} | {source_file} | {result}"
-            )
+            action_name = "APPROVE" if decision == "A" else "GENERAL"
+            log_line(cfg.log_path, f"{action_name} | {source_file} | {result}")
 
-        folder_cleanup_result = remove_folder_if_empty(folder, execute=cfg.execute)
-        counters[f"folder_cleanup_{folder_cleanup_result}"] += 1
-        log_line(cfg.log_path, f"FOLDER_CLEANUP | {folder} | {folder_cleanup_result}")
+        cleanup_results = remove_empty_dirs_bottom_up(folder, execute=cfg.execute)
+        for cleanup_result in cleanup_results:
+            counters["folder_cleanup_events"] += 1
+            log_line(cfg.log_path, f"FOLDER_CLEANUP | {cleanup_result}")
 
     summary = {
         "generated_at_utc": now_utc(),
         "execute": cfg.execute,
         "review_root": str(cfg.review_root),
         "general_root": str(cfg.general_root),
-        "plan_path": str(cfg.plan_path),
+        "clusters_path": str(cfg.clusters_path),
         "result_counters": dict(counters),
         "decisions_found": decisions_found,
     }
