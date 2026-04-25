@@ -5,16 +5,12 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Generated pipeline outputs
-pipeline_state/logs/
-pipeline_state/cache/
-pipeline_state/registry/
-
-# Media folders
+# Local runtime data
+pipeline_state/
 photos/
 organized/
 
-# Old Scripts
+# Old scripts
 scripts_old/
 
 # Editor / OS
@@ -22,7 +18,3 @@ scripts_old/
 .idea/
 .DS_Store
 Thumbs.db
-
-# Generated Ollama enrichment outputs
-pipeline_state/semantics/
-pipeline_state/links/
