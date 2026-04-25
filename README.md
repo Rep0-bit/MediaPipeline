@@ -1,6 +1,8 @@
 # MediaPipeline
 
-Pipeline local-first para organização de fotografias e vídeos por evento, com apoio de metadata EXIF, heurísticas temporais e validação manual assistida.
+Pipeline **local-first** para organização de fotografias e vídeos por evento, com apoio de metadata EXIF, heurísticas temporais e validação manual assistida.
+
+---
 
 ## Objetivo
 
@@ -10,13 +12,15 @@ Este projeto organiza uma biblioteca multimédia local em três destinos princip
 - `organized\_REVIEW` — clusters que requerem validação manual
 - `organized\_GENERAL` — duplicados, documentos e ficheiros sem classificação final de evento
 
-O fluxo foi desenhado para ser:
+O workflow foi desenhado para ser:
 
 - **local-only**
 - **não destrutivo**
 - **reversível**
 - **dry-run first**
 - com **originais preservados** em `photos`
+
+---
 
 ## Princípios do workflow
 
@@ -31,9 +35,11 @@ O fluxo foi desenhado para ser:
   - `_A` = aprovado
   - `_G` = enviar para General
 
+---
+
 ## Estrutura de pastas
 
-Exemplo de estrutura base:
+### Projeto
 
 ```text
 C:\Tools\MediaPipeline\
