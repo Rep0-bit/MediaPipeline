@@ -85,7 +85,8 @@ python .\scripts\process_review_folders.py --execute
 
 ## 3. Enriquecimento semântico com Ollama
 
-Esta etapa é opcional.
+> Esta camada é opcional e experimental.  
+> Os resultados devem ser interpretados como apoio à revisão manual, sobretudo na parte de sugestões multi-dia.
 
 ### 3.1 Gerar semântica por cluster
 ```powershell
@@ -132,6 +133,9 @@ pipeline_state\links\multiday_summary.json
 ---
 
 ## 5. Aplicação de IDs `__REV-xxxx`
+
+> A aplicação de `__REV-xxxx` não valida que as pastas pertençam ao mesmo evento.  
+> Apenas sinaliza uma hipótese de relação, que deve ser confirmada manualmente pelo utilizador.
 
 ### 5.1 Conceito
 O sistema **não agrega fisicamente ficheiros**.  

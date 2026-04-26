@@ -3,7 +3,7 @@
 ## v0.3-review-id-suggestions
 
 ### Estado
-Extensão funcional para sugestão de possíveis eventos multi-dia através da nomenclatura das pastas.
+Extensão funcional **experimental** para sugestão de possíveis eventos multi-dia através da nomenclatura das pastas.
 
 ### Inclui
 - aplicação de IDs `__REV-xxxx` a pastas sugeridas como relacionadas
@@ -11,6 +11,9 @@ Extensão funcional para sugestão de possíveis eventos multi-dia através da n
 - manutenção da estrutura diária original
 - ausência de agregação física automática
 - workflow de validação manual pelo utilizador
+
+### Limitação atual
+A funcionalidade encontra-se tecnicamente estável, mas a precisão semântica das sugestões multi-dia ainda não é suficientemente elevada para integração automática no workflow principal. Deve ser usada apenas como apoio à revisão manual.
 
 ### Scripts
 - `scripts/apply_review_ids.py`
@@ -25,7 +28,10 @@ Extensão funcional para sugestão de possíveis eventos multi-dia através da n
 ## v0.3-semantic-linking-calibrated
 
 ### Estado
-Camada experimental estabilizada para enriquecimento semântico de clusters e proposta prudente de possíveis ligações multi-dia.
+Camada experimental funcional para enriquecimento semântico de clusters e proposta prudente de possíveis ligações multi-dia.
+
+### Nota
+Os testes mostraram que a infraestrutura funciona corretamente, mas que a utilidade operacional das sugestões multi-dia continua dependente de validação humana, devido à existência de falsos positivos em contextos visuais semelhantes.
 
 ### Inclui
 - geração de nomes semânticos por cluster com Ollama
