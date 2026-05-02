@@ -28,7 +28,7 @@ python .\scripts\scan_media.py
 ```
 
 Resultado esperado:
-- criação/atualização do registo de media
+- criação ou atualização do registo de media
 - escrita em `pipeline_state\registry\media_registry.jsonl`
 
 ### 2.2 Resumo do registo
@@ -69,7 +69,10 @@ Resultado esperado:
 - envio de casos ambíguos para `_REVIEW`
 - envio de casos não classificados para `_GENERAL`
 
-### 2.6 Tratamento das pastas `_REVIEW`
+---
+
+## 3. Tratamento das pastas `_REVIEW`
+
 Depois de rever visualmente os conteúdos, o utilizador renomeia as pastas em `_REVIEW` com sufixos como:
 
 - `_A` para aprovadas
@@ -81,110 +84,13 @@ Depois executa:
 python .\scripts\process_review_folders.py --execute
 ```
 
----
-
-## 3. Enriquecimento semântico com Ollama
-
-> Esta camada é opcional e experimental.  
-> Os resultados devem ser interpretados como apoio à revisão manual, sobretudo na parte de sugestões multi-dia.
-
-### 3.1 Gerar semântica por cluster
-```powershell
-python .\scripts\generate_cluster_semantics.py --model gemma3:latest --vision --max-images 1 --use-format --fallback-text-only --limit 100
-```
-
-O script sugere:
-
-- `event_name_suggestion`
-- `tags`
-- `short_description`
-- `location_hint`
-- `likely_same_event_keywords`
-- `semantic_confidence`
-
-Os outputs são escritos em:
-
-```text
-pipeline_state\semantics\cluster_semantics.json
-pipeline_state\semantics\cluster_semantics.jsonl
-pipeline_state\semantics\cluster_semantics_summary.json
-```
+### Interpretação
+- `_A` → a pasta é aceite e entra na organização normal
+- `_G` → a pasta é enviada para a zona geral
 
 ---
 
-## 4. Propostas de ligações multi-dia
-
-### 4.1 Gerar candidatos
-```powershell
-python .\scripts\propose_multiday_links.py --max-gap-days 2
-```
-
-Este script gera pares candidatos a pertencer ao mesmo evento.
-
-Outputs:
-
-```text
-pipeline_state\links\multiday_candidate_pairs.json
-pipeline_state\links\multiday_candidate_groups.json
-pipeline_state\links\multiday_review.csv
-pipeline_state\links\multiday_summary.json
-```
-
----
-
-## 5. Aplicação de IDs `__REV-xxxx`
-
-> A aplicação de `__REV-xxxx` não valida que as pastas pertençam ao mesmo evento.  
-> Apenas sinaliza uma hipótese de relação, que deve ser confirmada manualmente pelo utilizador.
-
-### 5.1 Conceito
-O sistema **não agrega fisicamente ficheiros**.  
-Apenas marca as pastas diárias com um identificador comum para sugerir possível relação entre elas.
-
-Exemplo:
-
-```text
-08-13_Visita_Showroom__REV-0001
-08-14_Visita_Showroom__REV-0001
-```
-
-### 5.2 Dry-run
-```powershell
-python .\scripts\apply_review_ids.py --min-confidence medium
-```
-
-### 5.3 Execução real
-```powershell
-python .\scripts\apply_review_ids.py --min-confidence medium --execute
-```
-
-### 5.4 Outputs gerados
-```text
-pipeline_state\manifests\review_id_manifest.json
-pipeline_state\manifests\review_id_manifest.csv
-pipeline_state\manifests\review_id_summary.json
-```
-
----
-
-## 6. Revisão manual do utilizador
-
-Depois da aplicação dos IDs de revisão:
-
-1. abrir as pastas com o mesmo `__REV-xxxx`
-2. confirmar se pertencem ao mesmo evento
-3. juntar manualmente os conteúdos, se fizer sentido
-4. definir manualmente a nomenclatura final da pasta agregada
-
-O sistema não faz:
-- aprovação automática
-- rejeição automática
-- merge automático
-- renomeação final automática da pasta consolidada
-
----
-
-## 7. Fluxo completo resumido
+## 4. Fluxo completo resumido
 
 ```powershell
 python .\scripts\scan_media.py
@@ -192,28 +98,53 @@ python .\scripts\summarize_registry.py
 python .\scripts\cluster_temporal_preview.py
 python .\scripts\build_move_plan_preview.py
 python .\scripts\apply_simple_sort.py --execute
+
+# Rever manualmente a pasta _REVIEW e marcar cada pasta com _A ou _G
+
 python .\scripts\process_review_folders.py --execute
-python .\scripts\generate_cluster_semantics.py --model gemma3:latest --vision --max-images 1 --use-format --fallback-text-only --limit 100
-python .\scripts\propose_multiday_links.py --max-gap-days 2
-python .\scripts\apply_review_ids.py --min-confidence medium --execute
 ```
 
 ---
 
-## 8. Recomendações operacionais
+## 5. Revisão manual
 
-- usar `--limit 100` nas primeiras validações
-- preferir `--max-images 1` para estabilidade
-- tratar o sistema multi-dia como **sugestão**, não como decisão
-- validar visualmente sempre que duas pastas partilhem o mesmo `__REV-xxxx`
+A revisão manual serve para os casos em que o sistema não tem confiança suficiente para decidir sozinho.
+
+O utilizador deve:
+1. abrir as pastas em `_REVIEW`
+2. verificar se o conteúdo faz sentido como conjunto coerente
+3. marcar cada pasta com `_A` ou `_G`
+4. correr novamente `process_review_folders.py`
 
 ---
 
-## 9. Scripts em legado
+## 6. Recomendações operacionais
 
-Os seguintes scripts já não pertencem ao fluxo principal:
+- validar visualmente os casos colocados em `_REVIEW`
+- usar sempre cópias dos ficheiros na fase inicial de testes
+- confirmar o resultado final em `organized`
+- evitar decisões automáticas em casos ambíguos
+
+---
+
+## 7. Estrutura lógica do processo
+
+Em termos simples:
+
+1. o sistema lê os ficheiros
+2. tenta perceber a data de cada ficheiro
+3. agrupa os ficheiros por proximidade temporal
+4. organiza automaticamente o que é claro
+5. separa para revisão o que é duvidoso
+6. o utilizador decide manualmente os casos pendentes
+
+---
+
+## 8. Scripts em legado
+
+Os seguintes scripts já não pertencem ao fluxo principal e não devem ser usados:
 
 - `apply_move_plan.py`
-- `apply_multiday_ids.py`
-
-Devem ser considerados apenas legado/histórico.
+- `apply_review_ids.py`
+- `propose_multiday_links.py`
+- `generate_cluster_semantics.py`

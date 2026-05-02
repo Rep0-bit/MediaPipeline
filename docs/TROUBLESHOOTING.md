@@ -59,105 +59,56 @@ Get-Content .\pipeline_state\logs\apply_simple_sort.log -Tail 50
 
 ---
 
-## 4. O `generate_cluster_semantics.py` falha com Ollama
+## 4. O `process_review_folders.py` não move as pastas como esperado
 
-### Verificações úteis
+### Verificar se as pastas têm sufixo
+As pastas em `_REVIEW` devem terminar com algo como:
+- `_A`
+- `_G`
+
+### Verificação
 ```powershell
-ollama --version
-Invoke-RestMethod http://localhost:11434/api/ps
-```
-
-### Teste manual simples
-```powershell
-$body = @{
-  model = "gemma3:latest"
-  stream = $false
-  messages = @(
-    @{
-      role = "user"
-      content = "Return valid JSON with keys title and tags for a family trip."
-    }
-  )
-} | ConvertTo-Json -Depth 10
-
-Invoke-RestMethod -Uri "http://localhost:11434/api/chat" -Method Post -ContentType "application/json" -Body $body
+Get-ChildItem C:\Tools\Immich\organized\_REVIEW
 ```
 
 ### Causa provável
-- serviço Ollama não iniciado
-- modelo não descarregado
-- payload multimodal demasiado pesado
-- memória insuficiente
+A pasta não foi renomeada corretamente antes de correr o script.
 
 ---
 
-## 5. O `propose_multiday_links.py` gera zero candidatos
+## 5. O `build_move_plan_preview.py` cria resultados estranhos
 
 ### Possíveis causas
-- poucos clusters no ficheiro de semântica
-- clusters demasiado distintos
-- scoring demasiado conservador
-- `cluster_semantics.json` foi gerado com `--limit` demasiado baixo
+- datas inconsistentes
+- falta de metadata embebida
+- nomes de ficheiro pouco informativos
+- mistura de fotografias e ficheiros não relacionados na mesma pasta de entrada
 
 ### Verificação
 ```powershell
-Get-Content .\pipeline_state\links\multiday_summary.json
-```
-
-### Ação recomendada
-Regenerar semântica com mais clusters, por exemplo:
-
-```powershell
-python .\scripts\generate_cluster_semantics.py --model gemma3:latest --vision --max-images 1 --use-format --fallback-text-only --limit 100
-python .\scripts\propose_multiday_links.py --max-gap-days 2
+python .\scripts\summarize_registry.py
+python .\scripts\cluster_temporal_preview.py
 ```
 
 ---
 
-## 6. O `apply_review_ids.py` não renomeia pastas
+## 6. O resultado final em `organized` não parece coerente
 
-### Verificar se o ficheiro de revisão existe
-```powershell
-Get-Item .\pipeline_state\links\multiday_review.csv
-```
-
-### Verificar se o plano de pastas existe
-```powershell
-Get-Item .\pipeline_state\registry\move_plan_preview.jsonl
-```
-
-### Verificar o resumo do manifesto
-```powershell
-Get-Content .\pipeline_state\manifests\review_id_summary.json
-```
-
-### Causa provável
-- a confiança do candidato ficou abaixo de `--min-confidence`
-- a pasta original já não existe no local esperado
-- a pasta já foi renomeada anteriormente
-- o cluster já não corresponde ao estado atual das pastas
-
----
-
-## 7. Aparecem `folder_not_found` no `apply_review_ids.py`
+### Verificação recomendada
+1. abrir a pasta `organized`
+2. verificar as pastas diárias
+3. verificar o conteúdo de `_REVIEW`
+4. verificar o conteúdo de `_GENERAL`
 
 ### Interpretação
-O script encontrou a proposta no CSV, mas não conseguiu localizar uma ou mais pastas correspondentes no diretório `organized`.
-
-### Possíveis motivos
-- a pasta foi apagada
-- a pasta foi movida manualmente
-- a pasta já foi renomeada de forma diferente
-- o `move_plan_preview.jsonl` já não reflete o estado atual
-
-### Verificação
-```powershell
-Get-ChildItem C:\Tools\Immich\organized -Directory -Recurse | Where-Object { $_.Name -like "*__REV-*" } | Select-Object FullName
-```
+Nem todos os erros são falhas do programa. Muitas vezes o problema vem de:
+- datas ausentes
+- ficheiros exportados por apps que alteraram metadata
+- media misturado de várias origens
 
 ---
 
-## 8. Os acentos aparecem mal no PowerShell
+## 7. Os acentos aparecem mal no PowerShell
 
 ### Sintoma
 Texto como:
@@ -169,7 +120,7 @@ Problema de visualização da consola, não do ficheiro.
 
 ### Verificação correta
 ```powershell
-Get-Content .\pipeline_state\semantics\cluster_semantics.json -Encoding UTF8 -Head 20
+Get-Content .\pipeline_state\registry\media_registry.jsonl -Encoding UTF8 -Head 20
 ```
 
 ### Forçar UTF-8 na sessão
@@ -180,7 +131,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 ---
 
-## 9. O `git push` falha por falta de upstream
+## 8. O `git push` falha por falta de upstream
 
 ### Sintoma
 Mensagem a indicar que a branch não tem upstream.
@@ -192,7 +143,7 @@ git push --set-upstream origin nome-da-branch
 
 ---
 
-## 10. O projeto começa a ficar confuso com scripts antigos
+## 9. O projeto começa a ficar confuso com scripts antigos
 
 ### Recomendação
 No workflow atual, usar apenas:
@@ -204,14 +155,13 @@ cluster_temporal_preview.py
 build_move_plan_preview.py
 apply_simple_sort.py
 process_review_folders.py
-generate_cluster_semantics.py
-propose_multiday_links.py
-apply_review_ids.py
 ```
 
 Os seguintes scripts devem ser tratados como legado:
 
 ```text
 apply_move_plan.py
-apply_multiday_ids.py
+apply_review_ids.py
+propose_multiday_links.py
+generate_cluster_semantics.py
 ```

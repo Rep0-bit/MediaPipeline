@@ -1,48 +1,60 @@
 # Changelog
 
+## v0.4-base-workflow-only
+
+### Estado
+Workflow estabilizado e simplificado para organização local por data com revisão manual.
+
+### Inclui
+- scan de media
+- resumo do registo
+- clusterização temporal
+- preview de organização
+- organização automática por data
+- separação entre `_REVIEW` e `_GENERAL`
+- revisão manual por sufixos `_A` e `_G`
+
+### Scripts
+- `scripts/scan_media.py`
+- `scripts/summarize_registry.py`
+- `scripts/cluster_temporal_preview.py`
+- `scripts/build_move_plan_preview.py`
+- `scripts/apply_simple_sort.py`
+- `scripts/process_review_folders.py`
+
+### Nota
+Foram removidas do workflow principal as tentativas de enriquecimento semântico e de agregação multi-day, por não apresentarem precisão suficiente para uso operacional.
+
+---
+
 ## v0.3-review-id-suggestions
 
 ### Estado
-Extensão funcional **experimental** para sugestão de possíveis eventos multi-dia através da nomenclatura das pastas.
+Funcionalidade experimental de sugestão de possíveis eventos multi-day através da nomenclatura das pastas.
 
 ### Inclui
 - aplicação de IDs `__REV-xxxx` a pastas sugeridas como relacionadas
 - manifesto JSON e CSV com as propostas marcadas
 - manutenção da estrutura diária original
 - ausência de agregação física automática
-- workflow de validação manual pelo utilizador
 
-### Limitação atual
-A funcionalidade encontra-se tecnicamente estável, mas a precisão semântica das sugestões multi-dia ainda não é suficientemente elevada para integração automática no workflow principal. Deve ser usada apenas como apoio à revisão manual.
-
-### Scripts
-- `scripts/apply_review_ids.py`
-
-### Manifestos gerados
-- `pipeline_state/manifests/review_id_manifest.json`
-- `pipeline_state/manifests/review_id_manifest.csv`
-- `pipeline_state/manifests/review_id_summary.json`
+### Nota
+Esta funcionalidade deixou de integrar o workflow principal.
 
 ---
 
 ## v0.3-semantic-linking-calibrated
 
 ### Estado
-Camada experimental funcional para enriquecimento semântico de clusters e proposta prudente de possíveis ligações multi-dia.
-
-### Nota
-Os testes mostraram que a infraestrutura funciona corretamente, mas que a utilidade operacional das sugestões multi-dia continua dependente de validação humana, devido à existência de falsos positivos em contextos visuais semelhantes.
+Camada experimental de enriquecimento semântico de clusters e proposta prudente de possíveis ligações multi-day.
 
 ### Inclui
 - geração de nomes semânticos por cluster com Ollama
 - tags, descrição curta e localização sugerida
-- propostas multi-dia por pares
-- penalização de títulos genéricos
-- remoção de grupos agressivos por transitividade
+- propostas multi-day por pares
 
-### Scripts
-- `scripts/generate_cluster_semantics.py`
-- `scripts/propose_multiday_links.py`
+### Nota
+Os testes mostraram utilidade limitada e ocorrência de falsos positivos. Esta funcionalidade deixou de integrar o workflow principal.
 
 ---
 
