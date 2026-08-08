@@ -8,9 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DEFAULT_PLAN = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_preview.jsonl")
-DEFAULT_LOG = Path(r"C:\Tools\MediaPipeline\pipeline_state\logs\apply_simple_sort.log")
-DEFAULT_SUMMARY = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\apply_simple_sort_summary.json")
+import config
+
+DEFAULT_PLAN = config.MOVE_PLAN_JSONL
+DEFAULT_LOG = config.APPLY_SIMPLE_SORT_LOG
+DEFAULT_SUMMARY = config.APPLY_SIMPLE_SORT_SUMMARY_JSON
 
 
 def now_utc() -> str:

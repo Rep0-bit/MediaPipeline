@@ -10,12 +10,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DEFAULT_REVIEW_ROOT = Path(r"C:\Tools\Immich\organized\_REVIEW")
-DEFAULT_GENERAL_ROOT = Path(r"C:\Tools\Immich\organized\_GENERAL")
-DEFAULT_CLUSTERS_PATH = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\event_cluster_preview.json")
-DEFAULT_LOG_PATH = Path(r"C:\Tools\MediaPipeline\pipeline_state\logs\process_review_folders.log")
-DEFAULT_SUMMARY_PATH = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\process_review_folders_summary.json")
-DEFAULT_TARGET_ROOT = Path(r"C:\Tools\Immich\organized")
+import config
+
+DEFAULT_REVIEW_ROOT = config.REVIEW_ROOT
+DEFAULT_GENERAL_ROOT = config.GENERAL_ROOT
+DEFAULT_CLUSTERS_PATH = config.EVENT_CLUSTER_JSON
+DEFAULT_LOG_PATH = config.PROCESS_REVIEW_FOLDERS_LOG
+DEFAULT_SUMMARY_PATH = config.PROCESS_REVIEW_FOLDERS_SUMMARY_JSON
+DEFAULT_TARGET_ROOT = config.ORGANIZED_ROOT
 
 
 @dataclass

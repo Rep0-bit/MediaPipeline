@@ -4,8 +4,10 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-INPUT_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\media_registry.jsonl")
-OUTPUT_SUMMARY = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\media_registry_summary.json")
+import config
+
+INPUT_JSONL = config.MEDIA_REGISTRY_JSONL
+OUTPUT_SUMMARY = config.MEDIA_REGISTRY_SUMMARY_JSON
 
 
 def load_records(path: Path) -> list[dict]:

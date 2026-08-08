@@ -7,9 +7,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SOURCE_DIR = Path(r"C:\Tools\Immich\photos")
-OUTPUT_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\media_registry.jsonl")
-LOG_FILE = Path(r"C:\Tools\MediaPipeline\pipeline_state\logs\scan_media.log")
+import config
+
+SOURCE_DIR = config.SOURCE_PHOTOS_DIR
+OUTPUT_JSONL = config.MEDIA_REGISTRY_JSONL
+LOG_FILE = config.SCAN_MEDIA_LOG
 
 SUPPORTED_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff",

@@ -157,11 +157,16 @@ apply_simple_sort.py
 process_review_folders.py
 ```
 
-Os seguintes scripts devem ser tratados como legado:
+Scripts auxiliares experimentais (fora do fluxo principal, uso manual para
+propor ligações multi-dia por proximidade de GPS):
+
+```text
+inspect_cluster_gps.py
+propose_multiday_links_gps.py
+```
+
+Apenas um script é legado, e está em `scripts_old/` (não em `scripts/`):
 
 ```text
 apply_move_plan.py
-apply_review_ids.py
-propose_multiday_links.py
-generate_cluster_semantics.py
 ```

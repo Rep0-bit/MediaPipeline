@@ -7,15 +7,17 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-INPUT_CLUSTERS = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\event_cluster_preview.json")
-INPUT_REGISTRY = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\media_registry_enriched.jsonl")
+import config
 
-TARGET_ROOT = Path(r"C:\Tools\Immich\organized")
+INPUT_CLUSTERS = config.EVENT_CLUSTER_JSON
+INPUT_REGISTRY = config.MEDIA_REGISTRY_ENRICHED_JSONL
 
-OUTPUT_PLAN_JSON = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_preview.json")
-OUTPUT_PLAN_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_preview.jsonl")
-OUTPUT_PLAN_CSV = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_preview.csv")
-OUTPUT_SUMMARY_JSON = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\move_plan_summary.json")
+TARGET_ROOT = config.ORGANIZED_ROOT
+
+OUTPUT_PLAN_JSON = config.MOVE_PLAN_JSON
+OUTPUT_PLAN_JSONL = config.MOVE_PLAN_JSONL
+OUTPUT_PLAN_CSV = config.MOVE_PLAN_CSV
+OUTPUT_SUMMARY_JSON = config.MOVE_PLAN_SUMMARY_JSON
 
 DOCUMENT_KEYWORDS = {
     "cartão", "cartao", "cidadão", "cidadao", "cc_", "passport", "passaporte",

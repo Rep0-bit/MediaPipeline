@@ -8,10 +8,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-INPUT_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\media_registry.jsonl")
-OUTPUT_ENRICHED_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\media_registry_enriched.jsonl")
-OUTPUT_CLUSTER_JSON = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\event_cluster_preview.json")
-OUTPUT_CLUSTER_JSONL = Path(r"C:\Tools\MediaPipeline\pipeline_state\registry\event_cluster_preview.jsonl")
+import config
+
+INPUT_JSONL = config.MEDIA_REGISTRY_JSONL
+OUTPUT_ENRICHED_JSONL = config.MEDIA_REGISTRY_ENRICHED_JSONL
+OUTPUT_CLUSTER_JSON = config.EVENT_CLUSTER_JSON
+OUTPUT_CLUSTER_JSONL = config.EVENT_CLUSTER_JSONL
 
 HIGH_CONF_GAP_HOURS = 4
 MEDIUM_CONF_GAP_HOURS = 8
