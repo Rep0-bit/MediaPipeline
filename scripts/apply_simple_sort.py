@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import config
+import hash_index
 
 DEFAULT_PLAN = config.MOVE_PLAN_JSONL
 DEFAULT_LOG = config.APPLY_SIMPLE_SORT_LOG
@@ -100,17 +101,24 @@ def main() -> None:
 
     rows = load_rows(plan_path)
     counters = Counter()
+    newly_indexed: list[dict] = []
 
     log_line(log_path, f"START | execute={execute} | rows={len(rows)}")
 
     for row in rows:
-        source = Path(row["source_path"])
-        destination = Path(row["proposed_destination"])
         action = row.get("proposed_action", "unknown")
         bucket = row.get("proposed_bucket", "unknown")
 
         counters[f"bucket_{bucket}"] += 1
         counters[f"action_{action}"] += 1
+
+        if bucket == "skip":
+            counters["skipped_already_backed_up"] += 1
+            log_line(log_path, f"SKIP_ALREADY_BACKED_UP | {row.get('source_path')}")
+            continue
+
+        source = Path(row["source_path"])
+        destination = Path(row["proposed_destination"])
 
         if not source.exists():
             counters["source_missing"] += 1
@@ -121,12 +129,24 @@ def main() -> None:
 
         if result.startswith("copied"):
             counters["copied"] += 1
+            file_hash = row.get("hash_sha256")
+            if file_hash:
+                newly_indexed.append(
+                    {
+                        "hash_sha256": file_hash,
+                        "file_path": result.split(" -> ", 1)[1],
+                        "size_bytes": source.stat().st_size,
+                    }
+                )
         elif result.startswith("dry_run_copy"):
             counters["dry_run_planned"] += 1
         elif result.startswith("skipped_existing"):
             counters["skipped_existing"] += 1
 
         log_line(log_path, f"{bucket.upper()} | {action.upper()} | {source} | {result}")
+
+    if execute:
+        hash_index.append_indexed_files(newly_indexed)
 
     summary = {
         "generated_at_utc": now_utc(),

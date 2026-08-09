@@ -59,6 +59,13 @@ Resultado esperado:
 - proposta de organização por pastas
 - ficheiros de preview e resumo
 
+Antes de propor uma cópia, este passo verifica se o conteúdo do ficheiro (por
+hash) já está presente em qualquer local dentro de `organized\`, usando o
+índice descrito na secção 9. Se já estiver, o ficheiro é marcado como
+`already_backed_up` e não entra no plano de cópia — isto evita duplicar
+ficheiros já guardados, mesmo que o cluster de origem tenha sido renumerado
+entre execuções.
+
 ### 2.5 Aplicação da organização simples
 ```powershell
 python .\scripts\apply_simple_sort.py --execute
@@ -87,6 +94,16 @@ python .\scripts\process_review_folders.py --execute
 ### Interpretação
 - `_A` → a pasta é aceite e entra na organização normal
 - `_G` → a pasta é enviada para a zona geral
+
+### Nota sobre segurança do processamento
+A data do evento é lida diretamente do nome da pasta `_REVIEW` (não é
+recalculada a partir do cluster atual), por isso continua correta mesmo que
+`cluster_temporal_preview.py` tenha sido executado novamente entretanto e
+renumerado os clusters. Se o `cluster_id` da pasta já não existir no ficheiro
+de clusters atual, ou apontar agora para um dia diferente, o script escreve
+um aviso (`WARN_CLUSTER_ID_NOT_FOUND` / `WARN_CLUSTER_DAY_DRIFT`) no log — vale
+a pena confirmar visualmente esses casos, embora o ficheiro continue a ser
+processado para o dia correto.
 
 ---
 
@@ -142,9 +159,37 @@ Em termos simples:
 
 ## 8. Scripts em legado
 
-Os seguintes scripts já não pertencem ao fluxo principal e não devem ser usados:
+Apenas um script é legado, e está em `scripts_old/` (não em `scripts/`):
 
 - `apply_move_plan.py`
-- `apply_review_ids.py`
-- `propose_multiday_links.py`
-- `generate_cluster_semantics.py`
+
+Os scripts `inspect_cluster_gps.py` e `propose_multiday_links_gps.py` são
+auxiliares experimentais (uso manual, fora do fluxo principal descrito acima)
+para sugerir ligações multi-dia por proximidade de GPS.
+
+---
+
+## 9. Índice de hashes de `organized\` (evitar cópias duplicadas)
+
+`build_move_plan_preview.py` só sabe evitar propor cópias de ficheiros já
+guardados se souber o que já está dentro de `organized\`. Essa informação
+fica em `pipeline_state\registry\organized_hash_index.jsonl` e é atualizada
+automaticamente por `apply_simple_sort.py --execute` e
+`process_review_folders.py --execute` sempre que copiam ou movem um ficheiro.
+
+Correr manualmente `build_organized_hash_index.py` (reconstrução completa por
+hash de tudo o que está em `organized\`) é necessário em dois casos:
+
+1. **Uma vez, na primeira utilização**, para indexar o que já foi organizado
+   antes desta funcionalidade existir (incluindo pastas reorganizadas à mão).
+2. **Sempre que reorganizar ficheiros manualmente dentro de `organized\`**
+   (por exemplo, mover fotos para uma pasta com nome próprio) — essas
+   alterações não passam pelos scripts do pipeline, por isso não ficam
+   registadas automaticamente.
+
+```powershell
+python .\scripts\build_organized_hash_index.py
+```
+
+Não é necessário correr este script no fluxo normal e recorrente (secção 4) —
+os dois scripts que copiam/movem ficheiros já mantêm o índice atualizado.

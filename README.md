@@ -21,12 +21,15 @@ O sistema não faz interpretação semântica do conteúdo das imagens nem tenta
 
 ```text
 scripts/
+  config.py
   scan_media.py
   summarize_registry.py
   cluster_temporal_preview.py
   build_move_plan_preview.py
   apply_simple_sort.py
   process_review_folders.py
+  hash_index.py
+  build_organized_hash_index.py
 
 docs/
   GUIA_UTILIZACAO.md
@@ -59,6 +62,9 @@ docs/
 
 - `process_review_folders.py`  
   Processa as pastas em `_REVIEW` com base nos sufixos definidos manualmente pelo utilizador.
+
+- `build_organized_hash_index.py`  
+  Reconstrói o índice de hashes de tudo o que está em `organized/`, usado para evitar propor cópias de ficheiros já guardados. Ver secção 9 de `docs/GUIA_UTILIZACAO.md`.
 
 ---
 
@@ -126,6 +132,8 @@ py -m venv .venv
 - O utilizador mantém o controlo sobre as decisões finais.
 - A revisão manual continua a ser parte essencial do processo.
 - O foco atual está na estabilidade da organização base.
+- `apply_simple_sort.py` copia (não move) a partir de `photos/` — os originais nunca são alterados.
+- Um ficheiro já presente em `organized/` (por hash) nunca é proposto para nova cópia, mesmo que o cluster de origem tenha sido renumerado numa execução posterior.
 
 ---
 

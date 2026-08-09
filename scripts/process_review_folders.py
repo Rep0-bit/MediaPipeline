@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import config
+import hash_index
 
 DEFAULT_REVIEW_ROOT = config.REVIEW_ROOT
 DEFAULT_GENERAL_ROOT = config.GENERAL_ROOT
@@ -48,18 +50,25 @@ def load_clusters(path: Path) -> list[dict[str, Any]]:
         return json.load(f)
 
 
-def parse_review_folder_name(folder_name: str) -> tuple[str, str] | None:
-    match = re.match(r"^(?P<base>.+)_(?P<decision>[AG])$", folder_name)
-    if not match:
-        return None
-    return match.group("base"), match.group("decision")
+REVIEW_FOLDER_RE = re.compile(
+    r"^(?P<event_day>\d{4}-\d{2}-\d{2})_(?P<cluster_id>event-\d+)_(?P<decision>[AG])$"
+)
 
 
-def extract_cluster_id(base_name: str) -> str | None:
-    match = re.search(r"(event-\d{4})", base_name)
+def parse_review_folder_name(folder_name: str) -> tuple[str, str, str, str] | None:
+    """Parses the `<event_day>_<cluster_id>_<A|G>` naming produced by
+    build_move_plan_preview.py. event_day is read directly from the folder name
+    rather than re-derived from cluster_id, because cluster_id is reassigned
+    positionally on every cluster_temporal_preview.py run and may no longer
+    point at the same (or any) cluster by the time this is executed."""
+    match = REVIEW_FOLDER_RE.match(folder_name)
     if not match:
         return None
-    return match.group(1)
+    event_day = match.group("event_day")
+    cluster_id = match.group("cluster_id")
+    decision = match.group("decision")
+    base_name = f"{event_day}_{cluster_id}"
+    return base_name, event_day, cluster_id, decision
 
 
 def cluster_day_sequence_map(clusters: list[dict[str, Any]]) -> tuple[dict[str, str], dict[str, int]]:
@@ -91,6 +100,14 @@ def build_auto_folder(target_root: Path, event_day: str, cluster_id: str, cluste
 
     folder_name = month_day if seq == 1 else f"{month_day}_{seq:02d}"
     return target_root / year / folder_name
+
+
+def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        while chunk := f.read(chunk_size):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def classify_existing(source: Path, destination: Path) -> str:
@@ -198,6 +215,7 @@ def main() -> None:
 
     counters = Counter()
     decisions_found: list[dict[str, Any]] = []
+    newly_indexed: list[dict[str, Any]] = []
 
     review_dirs = [p for p in cfg.review_root.iterdir() if p.is_dir()]
     log_line(cfg.log_path, f"START | execute={cfg.execute} | review_dirs={len(review_dirs)}")
@@ -209,14 +227,26 @@ def main() -> None:
             log_line(cfg.log_path, f"IGNORE_NO_SUFFIX | {folder}")
             continue
 
-        base_name, decision = parsed
-        cluster_id = extract_cluster_id(base_name)
-        if not cluster_id:
-            counters["ignored_no_cluster_id"] += 1
-            log_line(cfg.log_path, f"IGNORE_NO_CLUSTER_ID | {folder}")
-            continue
+        base_name, event_day, cluster_id, decision = parsed
 
-        event_day = cluster_day.get(cluster_id, "missing")
+        current_cluster_day = cluster_day.get(cluster_id)
+        if current_cluster_day is None:
+            counters["warn_cluster_id_not_found"] += 1
+            log_line(
+                cfg.log_path,
+                f"WARN_CLUSTER_ID_NOT_FOUND | {folder} | cluster_id={cluster_id} not in current "
+                f"{cfg.clusters_path.name} (cluster set was likely regenerated since this review "
+                f"folder was created) | proceeding with folder-embedded event_day={event_day}",
+            )
+        elif current_cluster_day != event_day:
+            counters["warn_cluster_day_drift"] += 1
+            log_line(
+                cfg.log_path,
+                f"WARN_CLUSTER_DAY_DRIFT | {folder} | folder_event_day={event_day} | "
+                f"cluster_id={cluster_id} now maps to event_day={current_cluster_day} | "
+                f"proceeding with folder-embedded event_day={event_day}",
+            )
+
         files = iter_files(folder)
 
         if decision == "A":
@@ -249,6 +279,14 @@ def main() -> None:
 
             if result.startswith("moved"):
                 counters["files_moved"] += 1
+                moved_path = Path(result.split(" -> ", 1)[1])
+                newly_indexed.append(
+                    {
+                        "hash_sha256": sha256_file(moved_path),
+                        "file_path": str(moved_path),
+                        "size_bytes": moved_path.stat().st_size,
+                    }
+                )
             elif result.startswith("dry_run_move"):
                 counters["files_planned"] += 1
             elif result.startswith("skipped_existing"):
@@ -261,6 +299,9 @@ def main() -> None:
         for cleanup_result in cleanup_results:
             counters["folder_cleanup_events"] += 1
             log_line(cfg.log_path, f"FOLDER_CLEANUP | {cleanup_result}")
+
+    if cfg.execute:
+        hash_index.append_indexed_files(newly_indexed)
 
     summary = {
         "generated_at_utc": now_utc(),

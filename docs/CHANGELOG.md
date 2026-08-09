@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.5-consistency-and-safety-fixes
+
+### Estado
+Correções de consistência e de segurança sobre o workflow base estabilizado em v0.4, sem alterar a lógica de clusterização.
+
+### Inclui
+- correção dos scripts GPS (`inspect_cluster_gps.py`, `propose_multiday_links_gps.py`), que liam GPS em campos inexistentes e nunca encontravam nada; passam a ler `exif.gps.latitude`/`exif.gps.longitude`
+- centralização de todos os paths hardcoded (`C:\Tools\MediaPipeline`, `C:\Tools\Immich`) em `scripts/config.py`
+- correção de `process_review_folders.py`: a data do evento passa a ser lida do nome da pasta `_REVIEW` em vez de recalculada a partir de um `cluster_id` que pode já não corresponder ao mesmo cluster (renumeração entre execuções); avisos `WARN_CLUSTER_ID_NOT_FOUND`/`WARN_CLUSTER_DAY_DRIFT` tornam o desvio visível em vez de silencioso
+- índice de hashes de `organized/` (`scripts/hash_index.py`, `scripts/build_organized_hash_index.py`), consultado por `build_move_plan_preview.py` para nunca propor a cópia de um ficheiro cujo conteúdo já esteja em qualquer local dentro de `organized/`, independentemente do cluster ou nome de pasta atual
+- `.gitattributes` (`* text=auto`) para eliminar o churn de CRLF/LF nos diffs
+- correção de referências a scripts inexistentes em `docs/TROUBLESHOOTING.md` e `docs/GUIA_UTILIZACAO.md`
+
+### Scripts
+- `scripts/scan_media.py`
+- `scripts/summarize_registry.py`
+- `scripts/cluster_temporal_preview.py`
+- `scripts/build_move_plan_preview.py`
+- `scripts/apply_simple_sort.py`
+- `scripts/process_review_folders.py`
+- `scripts/build_organized_hash_index.py`
+- `scripts/config.py`, `scripts/hash_index.py` (suporte partilhado)
+
+### Nota
+`inspect_cluster_gps.py` e `propose_multiday_links_gps.py` continuam auxiliares e experimentais, fora do fluxo principal — apenas foram corrigidos, não promovidos a passo automático.
+
+---
+
 ## v0.4-base-workflow-only
 
 ### Estado

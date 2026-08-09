@@ -45,3 +45,8 @@ PROCESS_REVIEW_FOLDERS_LOG = LOGS_DIR / "process_review_folders.log"
 MULTIDAY_GPS_PAIRS_JSON = LINKS_DIR / "multiday_gps_candidate_pairs.json"
 MULTIDAY_GPS_REVIEW_CSV = LINKS_DIR / "multiday_gps_review.csv"
 MULTIDAY_GPS_SUMMARY_JSON = LINKS_DIR / "multiday_gps_summary.json"
+
+# Content-hash index of everything already copied/moved into ORGANIZED_ROOT.
+# Used to avoid proposing a copy of a file that has already been backed up,
+# regardless of which cluster/folder it lands under on a later rescan.
+ORGANIZED_HASH_INDEX_JSONL = REGISTRY_DIR / "organized_hash_index.jsonl"

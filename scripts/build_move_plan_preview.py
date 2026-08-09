@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import config
+import hash_index
 
 INPUT_CLUSTERS = config.EVENT_CLUSTER_JSON
 INPUT_REGISTRY = config.MEDIA_REGISTRY_ENRICHED_JSONL
@@ -178,6 +179,7 @@ def main() -> None:
 
     registry_by_path = {row["file_path"]: row for row in registry_rows}
     _, secondary_duplicate_paths = build_duplicate_info(registry_rows)
+    already_backed_up_hashes = hash_index.load_indexed_hashes()
 
     day_cluster_counts = cluster_count_per_day(clusters)
     cluster_day_seq = cluster_day_sequence_map(clusters)
@@ -200,11 +202,17 @@ def main() -> None:
             file_path = file_record["file_path"]
             file_name = file_record["file_name"]
             registry_row = registry_by_path.get(file_path)
+            file_hash = registry_row.get("hash_sha256") if registry_row else None
 
             is_document = is_document_file(file_name)
             is_duplicate_secondary = file_path in secondary_duplicate_paths
+            is_already_backed_up = bool(file_hash) and file_hash in already_backed_up_hashes
 
-            if is_document:
+            if is_already_backed_up:
+                proposed_bucket = "skip"
+                proposed_action = "already_backed_up"
+                proposed_folder = None
+            elif is_document:
                 proposed_bucket = "general"
                 proposed_action = "general_document"
                 proposed_folder = TARGET_ROOT / "_GENERAL" / "_DOCUMENTS" / safe_folder_part(cluster_id)
@@ -225,11 +233,14 @@ def main() -> None:
                 proposed_action = "review"
                 proposed_folder = TARGET_ROOT / "_REVIEW" / f"{event_day}_{cluster_id}"
 
-            proposed_destination = propose_destination(
-                folder_root=proposed_folder,
-                file_name=file_name,
-                used_paths=used_destination_paths,
-            )
+            if is_already_backed_up:
+                proposed_destination = ""
+            else:
+                proposed_destination = propose_destination(
+                    folder_root=proposed_folder,
+                    file_name=file_name,
+                    used_paths=used_destination_paths,
+                )
 
             review_recommended = proposed_bucket == "review"
 
@@ -245,7 +256,7 @@ def main() -> None:
                 "timestamp_start": cluster.get("timestamp_start"),
                 "timestamp_end": cluster.get("timestamp_end"),
                 "source_path": file_path,
-                "proposed_folder": str(proposed_folder),
+                "proposed_folder": str(proposed_folder) if proposed_folder is not None else "",
                 "proposed_destination": proposed_destination,
                 "file_name": file_name,
                 "effective_timestamp": file_record.get("effective_timestamp"),
@@ -254,7 +265,8 @@ def main() -> None:
                 "effective_timestamp_precision": file_record.get("effective_timestamp_precision"),
                 "is_document": is_document,
                 "is_duplicate_secondary": is_duplicate_secondary,
-                "hash_sha256": registry_row.get("hash_sha256") if registry_row else None,
+                "is_already_backed_up": is_already_backed_up,
+                "hash_sha256": file_hash,
             }
 
             move_plan.append(row)
@@ -269,6 +281,7 @@ def main() -> None:
         "auto_cluster_count": len({r["cluster_id"] for r in move_plan if r["proposed_bucket"] == "auto"}),
         "review_cluster_count": len({r["cluster_id"] for r in move_plan if r["proposed_bucket"] == "review"}),
         "general_cluster_count": len({r["cluster_id"] for r in move_plan if r["proposed_bucket"] == "general"}),
+        "already_backed_up_file_count": sum(1 for r in move_plan if r["proposed_bucket"] == "skip"),
     }
 
     OUTPUT_PLAN_JSON.parent.mkdir(parents=True, exist_ok=True)
@@ -307,6 +320,7 @@ def main() -> None:
                 "effective_timestamp_precision",
                 "is_document",
                 "is_duplicate_secondary",
+                "is_already_backed_up",
                 "hash_sha256",
             ],
         )
