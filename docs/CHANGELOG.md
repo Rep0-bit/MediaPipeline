@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.6-pipeline-orchestrator
+
+### Estado
+Adiciona um atalho de execução sobre o workflow estabilizado em v0.5, sem alterar a lógica de nenhum passo individual.
+
+### Inclui
+- `scripts/run_pipeline.py`: corre scan → resumo → clusterização → plano → aplicação numa única chamada, na ordem correta, parando imediatamente se algum passo falhar. Não inclui `process_review_folders.py`, que continua a exigir revisão manual das pastas `_REVIEW` antes de ser corrido.
+- Sem `--execute`, todos os passos correm em preview/dry-run (o comportamento por omissão de `apply_simple_sort.py`); com `--execute`, a flag é propagada apenas a esse passo.
+
+### Scripts
+- `scripts/run_pipeline.py`
+
+### Nota
+Testado de ponta a ponta em ambiente isolado (incluindo `--execute` real e uma segunda execução para confirmar que ficheiros já copiados são corretamente ignorados via o índice de hashes) e em modo preview contra o registry real.
+
+---
+
 ## v0.5-consistency-and-safety-fixes
 
 ### Estado

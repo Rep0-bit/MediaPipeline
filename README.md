@@ -28,6 +28,7 @@ scripts/
   build_move_plan_preview.py
   apply_simple_sort.py
   process_review_folders.py
+  run_pipeline.py
   hash_index.py
   build_organized_hash_index.py
 
@@ -63,6 +64,9 @@ docs/
 - `process_review_folders.py`  
   Processa as pastas em `_REVIEW` com base nos sufixos definidos manualmente pelo utilizador.
 
+- `run_pipeline.py`  
+  Atalho que corre scan → resumo → clusterização → plano → aplicação numa única chamada.
+
 - `build_organized_hash_index.py`  
   Reconstrói o índice de hashes de tudo o que está em `organized/`, usado para evitar propor cópias de ficheiros já guardados. Ver secção 9 de `docs/GUIA_UTILIZACAO.md`.
 
@@ -78,6 +82,13 @@ python .\scripts\summarize_registry.py
 python .\scripts\cluster_temporal_preview.py
 python .\scripts\build_move_plan_preview.py
 python .\scripts\apply_simple_sort.py --execute
+python .\scripts\process_review_folders.py --execute
+```
+
+Ou, para os primeiros cinco passos numa única chamada:
+
+```powershell
+python .\scripts\run_pipeline.py --execute
 python .\scripts\process_review_folders.py --execute
 ```
 

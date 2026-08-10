@@ -76,6 +76,23 @@ Resultado esperado:
 - envio de casos ambíguos para `_REVIEW`
 - envio de casos não classificados para `_GENERAL`
 
+### 2.6 Atalho: correr os passos 2.1–2.5 de uma vez
+
+`run_pipeline.py` corre scan → resumo → clusterização → plano → aplicação
+numa única chamada, na ordem correta, parando logo se algum passo falhar.
+Não substitui o passo manual da secção 3.
+
+```powershell
+python .\scripts\run_pipeline.py
+```
+
+Sem `--execute`, tudo corre em preview (nada é copiado). Para aplicar a
+organização a sério:
+
+```powershell
+python .\scripts\run_pipeline.py --execute
+```
+
 ---
 
 ## 3. Tratamento das pastas `_REVIEW`
@@ -109,12 +126,24 @@ processado para o dia correto.
 
 ## 4. Fluxo completo resumido
 
+Passo a passo:
+
 ```powershell
 python .\scripts\scan_media.py
 python .\scripts\summarize_registry.py
 python .\scripts\cluster_temporal_preview.py
 python .\scripts\build_move_plan_preview.py
 python .\scripts\apply_simple_sort.py --execute
+
+# Rever manualmente a pasta _REVIEW e marcar cada pasta com _A ou _G
+
+python .\scripts\process_review_folders.py --execute
+```
+
+Ou, usando o atalho da secção 2.6 para os primeiros cinco passos:
+
+```powershell
+python .\scripts\run_pipeline.py --execute
 
 # Rever manualmente a pasta _REVIEW e marcar cada pasta com _A ou _G
 
