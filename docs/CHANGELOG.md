@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.7-incremental-scan
+
+### Estado
+Torna `scan_media.py` incremental e resistente a interrupções, sem alterar o formato das restantes etapas do workflow.
+
+### Inclui
+- `scan_media.py` passa a reaproveitar o registo de ficheiros já indexados cujo tamanho e data de modificação não mudaram desde a última execução, evitando reprocessamento (ExifTool + hash) desnecessário à medida que a biblioteca cresce.
+- Novo campo `mtime_epoch` em cada registo, usado (junto com `size_bytes`) para detetar ficheiros alterados.
+- Ficheiros removidos da pasta de origem deixam de aparecer no registo depois de uma nova execução.
+- Escrita atómica do registo (ficheiro temporário + `os.replace` no final) — uma interrupção a meio da execução já não destrói o registo existente, ao contrário do comportamento anterior (que truncava o ficheiro no início e escrevia progressivamente).
+- Nova flag `--full-rescan` para forçar o reprocessamento completo quando necessário (ex.: depois de atualizar o ExifTool).
+
+### Scripts
+- `scripts/scan_media.py`
+
+### Nota
+Registos escritos pela versão anterior do script não têm `mtime_epoch`, por isso a primeira execução após esta atualização reprocessa a biblioteca inteira uma única vez (custo de migração); execuções seguintes já beneficiam da reutilização incremental. Testado com cenários sintéticos (ficheiro inalterado, alterado, novo e removido) e verificado contra o registry real (7364 ficheiros).
+
+---
+
 ## v0.6-pipeline-orchestrator
 
 ### Estado

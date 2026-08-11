@@ -44,7 +44,7 @@ docs/
 
 ### Organização base
 - `scan_media.py`  
-  Faz o scan dos ficheiros de media e cria o registo base.
+  Faz o scan dos ficheiros de media e cria/atualiza o registo base. Incremental: reaproveita o registo de ficheiros já indexados e inalterados (`--full-rescan` força o reprocessamento total).
 
 - `summarize_registry.py`  
   Gera um resumo estatístico do registo.
@@ -145,6 +145,7 @@ py -m venv .venv
 - O foco atual está na estabilidade da organização base.
 - `apply_simple_sort.py` copia (não move) a partir de `photos/` — os originais nunca são alterados.
 - Um ficheiro já presente em `organized/` (por hash) nunca é proposto para nova cópia, mesmo que o cluster de origem tenha sido renumerado numa execução posterior.
+- `scan_media.py` só reprocessa ficheiros novos ou alterados desde a última execução; a escrita do registo é atómica (ficheiro temporário + substituição no final), por isso uma interrupção a meio não destrói o registo existente.
 
 ---
 

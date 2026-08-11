@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -106,12 +108,14 @@ def build_record(path: Path) -> dict[str, Any]:
     timestamp_info = normalize_timestamp(metadata)
     gps = extract_gps(metadata)
     camera = extract_camera(metadata)
+    stat = path.stat()
 
     return {
         "file_path": str(path),
         "file_name": path.name,
         "extension": path.suffix.lower(),
-        "size_bytes": path.stat().st_size,
+        "size_bytes": stat.st_size,
+        "mtime_epoch": int(stat.st_mtime),
         "hash_sha256": sha256_file(path),
         "exif": {
             "created_at": timestamp_info["value"],
@@ -129,7 +133,41 @@ def build_record(path: Path) -> dict[str, Any]:
     }
 
 
+def load_existing_records(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        return {}
+
+    records: dict[str, dict[str, Any]] = {}
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            records[record["file_path"]] = record
+    return records
+
+
+def is_unchanged(record: dict[str, Any], path: Path) -> bool:
+    if "mtime_epoch" not in record:
+        return False
+    stat = path.stat()
+    return record.get("size_bytes") == stat.st_size and record.get("mtime_epoch") == int(stat.st_mtime)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Faz o scan dos ficheiros de media e atualiza o registo. "
+        "Por omissão, ficheiros já indexados (mesmo tamanho e mtime) não são "
+        "reprocessados — reutiliza-se o registo anterior para esses casos."
+    )
+    parser.add_argument(
+        "--full-rescan",
+        action="store_true",
+        help="Ignora o cache e reprocessa (ExifTool + hash) todos os ficheiros, mesmo os já indexados.",
+    )
+    args = parser.parse_args()
+
     OUTPUT_JSONL.parent.mkdir(parents=True, exist_ok=True)
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -138,18 +176,53 @@ def main() -> None:
         if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
     ]
 
-    log(f"Found {len(files)} supported media files in {SOURCE_DIR}")
+    existing_records = {} if args.full_rescan else load_existing_records(OUTPUT_JSONL)
+    removed_count = len(existing_records) - sum(1 for p in files if str(p) in existing_records)
 
-    with OUTPUT_JSONL.open("w", encoding="utf-8") as out:
+    log(
+        f"Found {len(files)} supported media files in {SOURCE_DIR} "
+        f"({len(existing_records)} previously indexed, full_rescan={args.full_rescan})"
+    )
+
+    reused_count = 0
+    new_count = 0
+    changed_count = 0
+    error_count = 0
+
+    tmp_path = OUTPUT_JSONL.with_suffix(OUTPUT_JSONL.suffix + ".tmp")
+    with tmp_path.open("w", encoding="utf-8") as out:
         for idx, path in enumerate(files, start=1):
+            file_path_str = str(path)
+            existing = existing_records.get(file_path_str)
+
+            if existing is not None and is_unchanged(existing, path):
+                out.write(json.dumps(existing, ensure_ascii=False) + "\n")
+                reused_count += 1
+                continue
+
             try:
                 record = build_record(path)
                 out.write(json.dumps(record, ensure_ascii=False) + "\n")
-                log(f"[{idx}/{len(files)}] Indexed: {path.name}")
+                if existing is None:
+                    new_count += 1
+                    log(f"[{idx}/{len(files)}] NEW: {path.name}")
+                else:
+                    changed_count += 1
+                    log(f"[{idx}/{len(files)}] CHANGED: {path.name}")
             except Exception as exc:
-                log(f"[{idx}/{len(files)}] ERROR: {path} | {exc}")
+                error_count += 1
+                if existing is not None:
+                    out.write(json.dumps(existing, ensure_ascii=False) + "\n")
+                    log(f"[{idx}/{len(files)}] ERROR (a manter registo anterior): {path} | {exc}")
+                else:
+                    log(f"[{idx}/{len(files)}] ERROR: {path} | {exc}")
 
-    log(f"Finished. Output written to {OUTPUT_JSONL}")
+    os.replace(tmp_path, OUTPUT_JSONL)
+
+    log(
+        f"Finished. reused={reused_count} new={new_count} changed={changed_count} "
+        f"removed={removed_count} errors={error_count}. Output written to {OUTPUT_JSONL}"
+    )
 
 
 if __name__ == "__main__":

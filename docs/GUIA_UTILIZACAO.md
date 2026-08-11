@@ -31,6 +31,22 @@ Resultado esperado:
 - criação ou atualização do registo de media
 - escrita em `pipeline_state\registry\media_registry.jsonl`
 
+Este passo é incremental: um ficheiro já indexado numa execução anterior
+(mesmo tamanho e data de modificação) não volta a ser processado pelo
+ExifTool nem re-hashado — o registo anterior é reaproveitado. Só ficheiros
+novos ou alterados desde a última execução são processados de raiz, e
+ficheiros removidos da origem deixam de aparecer no registo. Isto torna
+execuções recorrentes muito mais rápidas à medida que a biblioteca cresce, e
+protege o registo de uma interrupção a meio (a escrita é feita para um
+ficheiro temporário e só substitui o registo existente no final, com sucesso).
+
+Para forçar o reprocessamento completo de tudo (por exemplo, depois de
+atualizar o ExifTool, ou se suspeitar de dados corrompidos):
+
+```powershell
+python .\scripts\scan_media.py --full-rescan
+```
+
 ### 2.2 Resumo do registo
 ```powershell
 python .\scripts\summarize_registry.py
