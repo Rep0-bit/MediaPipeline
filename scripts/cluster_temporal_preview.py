@@ -206,14 +206,13 @@ def should_split_cluster(prev: dict[str, Any], curr: dict[str, Any]) -> bool:
     if prev_dt is None or curr_dt is None:
         return True
 
-    if prev_dt.date() != curr_dt.date():
-        return True
-
     prev_precision = prev["effective_timestamp_precision"]
     curr_precision = curr["effective_timestamp_precision"]
 
     if prev_precision == "date" or curr_precision == "date":
-        return False
+        # Sem hora real (só data), não é seguro calcular um gap em horas —
+        # só continuamos o cluster se for literalmente o mesmo dia civil.
+        return prev_dt.date() != curr_dt.date()
 
     gap = curr_dt - prev_dt
     gap_hours = gap.total_seconds() / 3600.0

@@ -66,6 +66,13 @@ Resultado esperado:
 - enriquecimento do registo com `effective_timestamp`
 - criação de preview de clusters
 
+Um evento que atravesse a meia-noite (por exemplo, fotos entre as 23h e as
+2h) mantém-se num único cluster, desde que o intervalo real entre fotos
+consecutivas não ultrapasse o limite de confiança aplicável (4h para alta
+confiança, 8h para média, 12h para baixa) — deixou de haver separação forçada
+só por mudar o dia civil. Ficheiros sem hora real (só data) continuam a só
+juntar-se a outros do mesmo dia civil, por segurança.
+
 ### 2.4 Plano de organização
 ```powershell
 python .\scripts\build_move_plan_preview.py

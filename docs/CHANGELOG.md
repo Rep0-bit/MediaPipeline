@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.8-midnight-boundary-clustering
+
+### Estado
+Corrige um caso de over-splitting na clusterização temporal, sem alterar os limites de confiança nem a lógica de deteção de timestamp.
+
+### Inclui
+- `cluster_temporal_preview.py` deixa de forçar uma separação de cluster só por o timestamp seguinte cair num dia civil diferente. Passa a aplicar o mesmo critério de sempre (gap em horas vs. limite de confiança — 4h/8h/12h) também através da fronteira da meia-noite, em vez de um corte incondicional por data.
+- Ficheiros com precisão apenas de data (sem hora real) mantêm o comportamento anterior por segurança: só se juntam a outros do mesmo dia civil, porque não é possível calcular um gap fiável sem hora.
+
+### Nota
+Testado com 8 cenários sintéticos (gap pequeno/grande atravessando meia-noite, gap pequeno/grande no mesmo dia, precisão só-data atravessando/não atravessando meia-noite, precisão mista, timestamp em falta) e verificado contra o registry real: 660 → 651 clusters (9 fusões). Inspecionado um caso em detalhe (`event-0151`, fotos de WhatsApp entre a noite de 6 e a manhã de 7 de dezembro de 2024) para confirmar que a fusão resulta de uma cadeia de gaps individualmente válidos, não de uma fusão indevida.
+
+---
+
 ## v0.7-incremental-scan
 
 ### Estado

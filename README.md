@@ -50,7 +50,7 @@ docs/
   Gera um resumo estatístico do registo.
 
 - `cluster_temporal_preview.py`  
-  Enriquece timestamps e gera clusters temporais.
+  Enriquece timestamps e gera clusters temporais. Um evento que atravesse a meia-noite mantém-se num único cluster, desde que o intervalo real entre fotos não ultrapasse o limite de confiança aplicável.
 
 - `build_move_plan_preview.py`  
   Propõe a organização-alvo das pastas.
