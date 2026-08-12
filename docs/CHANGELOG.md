@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.9-immich-library-setup-guide
+
+### Estado
+Adiciona documentação operacional sobre a integração com o Immich; não altera nenhum script do pipeline.
+
+### Inclui
+- Novo `docs/IMMICH_LIBRARY_SETUP.md`: procedimento passo a passo, com mockups ilustrativos do painel de administração do Immich, para verificar e corrigir a configuração da External Library — deve apontar apenas para `organized/`, nunca para `photos/`.
+- Nova secção "Integração com o Immich" em `README.md`, a explicar a expetativa de configuração e a apontar para o guia.
+- Mockups em `docs/images/immich-*.svg` (SVG ilustrativo, não capturas reais).
+
+### Nota
+Motivado por uma configuração incorreta encontrada e corrigida nesta instalação: a External Library do Immich estava a apontar tanto para `photos/` (despejo bruto) como para `organized/` (resultado curado), duplicando cada ficheiro no índice do Immich e tornando a triagem deste pipeline sem efeito prático na biblioteca visível. Corrigido diretamente na base de dados do Immich (`library.importPaths`); cópia de segurança do estado anterior em `pipeline_state/immich_backup/` (fora do controlo de versões).
+
+---
+
 ## v0.8-midnight-boundary-clustering
 
 ### Estado

@@ -36,6 +36,7 @@ docs/
   GUIA_UTILIZACAO.md
   TROUBLESHOOTING.md
   CHANGELOG.md
+  IMMICH_LIBRARY_SETUP.md
 ```
 
 ---
@@ -110,6 +111,22 @@ Recebe ficheiros ou conjuntos de ficheiros que precisam de validação manual.
 
 ### `_GENERAL`
 Recebe ficheiros que não devem ser tratados como evento específico.
+
+---
+
+## Integração com o Immich
+
+Este projeto assume que `organized/` é consumido por uma instalação local
+do [Immich](https://immich.app/) (self-hosted, sem depender de serviços
+cloud) configurada como **External Library**, apontando **apenas** para
+`organized/` — nunca para `photos/` (o despejo bruto, sem triagem).
+
+Se a External Library do Immich apontar também para `photos/`, a triagem
+feita por este pipeline deixa de ter efeito no que aparece no Immich, e cada
+ficheiro fica indexado duas vezes. Ver
+[`docs/IMMICH_LIBRARY_SETUP.md`](docs/IMMICH_LIBRARY_SETUP.md) para o
+procedimento passo a passo (com mockups do painel de administração) para
+verificar e corrigir isto.
 
 ---
 
