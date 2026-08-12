@@ -13,6 +13,11 @@ Adiciona documentação operacional sobre a integração com o Immich; não alte
 ### Nota
 Motivado por uma configuração incorreta encontrada e corrigida nesta instalação: a External Library do Immich estava a apontar tanto para `photos/` (despejo bruto) como para `organized/` (resultado curado), duplicando cada ficheiro no índice do Immich e tornando a triagem deste pipeline sem efeito prático na biblioteca visível. Corrigido diretamente na base de dados do Immich (`library.importPaths`); cópia de segurança do estado anterior em `pipeline_state/immich_backup/` (fora do controlo de versões).
 
+Os mockups foram revistos numa correção de seguimento depois de o utilizador
+confirmar, com capturas de ecrã reais, que a interface real está em
+português e usa uma estrutura de menu diferente da assumida inicialmente
+(ex.: "Bibliotecas externas" como item próprio no menu, não "Definições").
+
 ---
 
 ## v0.8-midnight-boundary-clustering
