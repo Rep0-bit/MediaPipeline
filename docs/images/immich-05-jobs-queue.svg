@@ -1,0 +1,80 @@
+<svg viewBox="0 0 1200 620" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <rect x="0" y="0" width="1200" height="620" fill="#0b0b0d"/>
+
+  <!-- top bar -->
+  <rect x="0" y="0" width="1200" height="56" fill="#0b0b0d" stroke="#232326" stroke-width="1"/>
+  <text x="24" y="35" font-size="20" font-weight="700" fill="#f2f3f5">immich</text>
+  <rect x="300" y="16" width="500" height="24" rx="12" fill="#151517" stroke="#28282b"/>
+  <text x="316" y="32" font-size="12" fill="#8a8a90">Pesquisar fotos</text>
+  <circle cx="1150" cy="28" r="15" fill="#e8623a"/>
+  <text x="1145" y="33" font-size="12" fill="#0b0b0d" font-weight="700">A</text>
+
+  <!-- sidebar -->
+  <rect x="0" y="56" width="220" height="564" fill="#0b0b0d" stroke="#1c1c1f"/>
+  <g font-size="13.5" fill="#c7c8cc">
+    <text x="52" y="130">Utilizadores</text>
+  </g>
+  <rect x="0" y="162" width="220" height="34" fill="#151517"/>
+  <text x="52" y="184" font-size="13.5" fill="#c7c8cc">Bibliotecas externas</text>
+  <rect x="0" y="196" width="220" height="34" fill="#17181f"/>
+  <rect x="0" y="196" width="3" height="34" fill="#6b7bd6"/>
+  <text x="52" y="218" font-size="13.5" font-weight="600" fill="#a9b3ec">Filas de tarefas</text>
+  <g font-size="13.5" fill="#c7c8cc">
+    <text x="52" y="264">Definições</text>
+    <text x="52" y="308">Manutenção</text>
+    <text x="52" y="352">Estado do servidor</text>
+  </g>
+
+  <!-- main content -->
+  <text x="244" y="90" font-size="18" font-weight="600" fill="#f2f3f5">Filas de tarefas</text>
+  <rect x="1040" y="72" width="90" height="24" rx="4" fill="#151517"/>
+  <text x="1050" y="88" font-size="10.5" fill="#a9b3ec">+ Criar tarefa</text>
+
+  <!-- card 1: Gerar Miniaturas -->
+  <rect x="244" y="112" width="440" height="120" rx="8" fill="#141416" stroke="#232326"/>
+  <rect x="244" y="112" width="440" height="20" rx="8" fill="#2f9e57"/>
+  <rect x="244" y="122" width="440" height="10" fill="#2f9e57"/>
+  <text x="464" y="126" font-size="10" fill="#0b0b0d" font-weight="700" text-anchor="middle">Em execução</text>
+  <text x="264" y="158" font-size="14" font-weight="700" fill="#e4e4e7">🖼 Gerar Miniaturas</text>
+  <text x="264" y="178" font-size="10.5" fill="#9296a3">Gera miniaturas para cada ficheiro e pessoa</text>
+  <rect x="264" y="190" width="90" height="24" rx="12" fill="#1c2440"/>
+  <text x="274" y="206" font-size="10.5" fill="#a9b3ec">Em execução  2</text>
+  <rect x="360" y="190" width="90" height="24" rx="12" fill="#1c1c1f"/>
+  <text x="372" y="206" font-size="10.5" fill="#e4e4e7">Em fila  1454</text>
+
+  <!-- card 2: Extrair Metadados -->
+  <rect x="700" y="112" width="440" height="120" rx="8" fill="#141416" stroke="#232326"/>
+  <rect x="700" y="112" width="440" height="20" rx="8" fill="#2f9e57"/>
+  <rect x="700" y="122" width="440" height="10" fill="#2f9e57"/>
+  <text x="920" y="126" font-size="10" fill="#0b0b0d" font-weight="700" text-anchor="middle">Em execução</text>
+  <text x="720" y="158" font-size="14" font-weight="700" fill="#e4e4e7">⊞ Extrair Metadados</text>
+  <text x="720" y="178" font-size="10.5" fill="#9296a3">GPS, rostos e resolução de cada ficheiro</text>
+  <rect x="720" y="190" width="90" height="24" rx="12" fill="#1c2440"/>
+  <text x="730" y="206" font-size="10.5" fill="#a9b3ec">Em execução  3</text>
+  <rect x="816" y="190" width="90" height="24" rx="12" fill="#1c1c1f"/>
+  <text x="828" y="206" font-size="10.5" fill="#e4e4e7">Em fila  1685</text>
+
+  <!-- card 3: Bibliotecas Externas -->
+  <rect x="244" y="248" width="440" height="110" rx="8" fill="#141416" stroke="#232326"/>
+  <text x="264" y="280" font-size="14" font-weight="700" fill="#e4e4e7">⊟ Bibliotecas Externas</text>
+  <text x="264" y="300" font-size="10.5" fill="#9296a3">Pesquisa itens novos e/ou alterados</text>
+  <rect x="264" y="312" width="90" height="24" rx="12" fill="#1c1c1f"/>
+  <text x="278" y="328" font-size="10.5" fill="#9296a3">Em execução  0</text>
+  <rect x="360" y="312" width="70" height="24" rx="12" fill="#1c1c1f"/>
+  <text x="372" y="328" font-size="10.5" fill="#9296a3">Em fila  0</text>
+
+  <!-- annotation -->
+  <rect x="244" y="112" width="896" height="120" fill="none" stroke="#f5a524" stroke-width="2.5" stroke-dasharray="5,4"/>
+  <path d="M 690 400 L 690 236" stroke="#f5a524" stroke-width="2.5" marker-end="url(#arrow5)"/>
+  <defs>
+    <marker id="arrow5" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f5a524"/>
+    </marker>
+  </defs>
+  <rect x="360" y="404" width="460" height="56" rx="6" fill="#3a2c10" stroke="#f5a524"/>
+  <text x="376" y="426" font-size="12.5" fill="#f5a524" font-weight="700">Acompanhar aqui: "Em fila" a descer até 0</text>
+  <text x="376" y="446" font-size="11.5" fill="#e8c887">em "Gerar Miniaturas" e "Extrair Metadados"</text>
+
+  <text x="264" y="500" font-size="11.5" fill="#6b6f7a">(mais cartões abaixo: Metadados Secundários, Pesquisa Inteligente,</text>
+  <text x="264" y="518" font-size="11.5" fill="#6b6f7a">Deteção de Itens Duplicados — não é preciso vigiar estes para este passo)</text>
+</svg>

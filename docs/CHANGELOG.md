@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.10-complete-workflow-guide
+
+### Estado
+Adiciona documentação de visão geral que liga o pipeline e o Immich num único fluxo; não altera nenhum script.
+
+### Inclui
+- Novo `docs/WORKFLOW.md`: ponto de entrada da documentação — diagrama (mermaid) e tabela resumo de todo o processo, desde as fotos no telemóvel até estarem visíveis no Immich. Explica explicitamente a fronteira entre as duas metades do processo (organização física, feita pelos scripts; consumo/visualização, feito pelo Immich) e responde a perguntas frequentes sobre essa fronteira.
+- Nova imagem `docs/images/immich-05-jobs-queue.svg` (mockup de "Filas de tarefas", com base em captura de ecrã real partilhada pelo utilizador) e referência atualizada em `docs/IMMICH_LIBRARY_SETUP.md` — passo 3 agora explica que é normal ver picos temporários em "Gerar Miniaturas"/"Extrair Metadados" (não só em "Bibliotecas Externas") e que as contagens de Fotos/Vídeos podem subir antes de descer, com base em comportamento real observado nesta instalação.
+- Nova secção sobre limpeza do lixo do Immich em `docs/IMMICH_LIBRARY_SETUP.md`.
+- `README.md` aponta para `docs/WORKFLOW.md` como ponto de entrada recomendado.
+
+---
+
 ## v0.9-immich-library-setup-guide
 
 ### Estado

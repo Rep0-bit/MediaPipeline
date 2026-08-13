@@ -64,11 +64,21 @@ Remover `/mnt/photos` de **Pastas** **não remove imediatamente** os
 ficheiros já indexados a partir desse caminho — isso só acontece na próxima
 análise da biblioteca.
 
-![Botão "Analisar" destacado no topo da página de detalhes, com o progresso da tarefa em "Filas de tarefas" e nota sobre a análise noturna automática](images/immich-04-scan-trigger.svg)
+![Botão "Analisar" destacado no topo da página de detalhes, com nota sobre a análise noturna automática](images/immich-04-scan-trigger.svg)
 
 1. No topo da página da biblioteca, clicar em **Analisar** para forçar a
    análise de imediato.
-2. Acompanhar o progresso em **Filas de tarefas** (menu lateral).
+2. Acompanhar o progresso em **Filas de tarefas** (menu lateral) — depois de
+   analisar, é normal ver picos temporários em **Gerar Miniaturas** e
+   **Extrair Metadados** (não só em "Bibliotecas Externas"), porque
+   caminhos novos ou alterados disparam reprocessamento nessas filas
+   também. O que interessa é o número em "Em fila" descer até 0.
+
+![Página "Filas de tarefas" com "Gerar Miniaturas" e "Extrair Metadados" a processar centenas de itens em fila, e anotação a indicar o que observar](images/immich-05-jobs-queue.svg)
+
+Isto pode demorar de minutos a mais tempo, dependendo do volume e do
+hardware — não é preciso ficar a vigiar, só confirmar mais tarde que "Em
+fila" chegou a 0.
 
 Se não quiser fazer nada manualmente, o Immich corre isto de qualquer forma
 todas as noites à meia-noite — ver `library.scan.cronExpression` em
@@ -85,11 +95,31 @@ todas as noites à meia-noite — ver `library.scan.cronExpression` em
   montada como só-leitura (`:ro` em `docker-compose.yml`), por isso o Immich
   só pode alterar o seu próprio índice, nunca os ficheiros de origem.
 - As contagens de **Fotos** e **Vídeos** nos cartões do topo da página
-  descem para refletir apenas o conteúdo de `/mnt/organized`.
-- O que sobra no Immich passa a corresponder exatamente ao resultado curado
-  deste pipeline, incluindo o histórico de reconhecimento facial
-  (pessoas/rostos), que se mantém para os ficheiros que também existem em
-  `organized/`.
+  **podem subir antes de descer**, sobretudo se a biblioteca não for
+  analisada há muito tempo — o Immich está a reconciliar tudo o que mudou
+  desde a última análise de uma só vez (incluindo ficheiros que mudaram de
+  pasta dentro de `organized/` por causa de revisões anteriores), não só a
+  remover `/mnt/photos`. Estes cartões parecem contar também os ativos já
+  no lixo, por isso só estabilizam de facto quando as filas em **Filas de
+  tarefas** chegarem a 0. O número fiável para confirmar é o de ficheiros
+  ativos na página de detalhes da biblioteca (ver nota abaixo) — não o
+  número mostrado a meio do processo.
+- O que sobra no Immich (a **timeline principal**, não a página de admin)
+  passa a corresponder exatamente ao resultado curado deste pipeline,
+  incluindo o histórico de reconhecimento facial (pessoas/rostos), que se
+  mantém para os ficheiros que também existem em `organized/`.
+
+### Limpar o lixo (opcional)
+
+Os itens marcados offline vão para o **Lixo** do Immich (menu principal, não
+o de administração) e são apagados automaticamente ao fim de 30 dias. Podes
+esvaziar o lixo manualmente mais cedo se quiseres — usa a opção de esvaziar
+lixo **na própria interface do Immich**, nunca apagando registos
+diretamente na base de dados: uma eliminação em massa por SQL arrisca deixar
+miniaturas, embeddings de pesquisa e outros dados relacionados órfãos, que
+só a aplicação sabe limpar corretamente. Em qualquer dos casos, os
+ficheiros originais nunca são afetados — o lixo do Immich só apaga o
+próprio índice.
 
 ---
 

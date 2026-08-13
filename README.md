@@ -15,6 +15,10 @@ A lógica atual privilegia:
 
 O sistema não faz interpretação semântica do conteúdo das imagens nem tenta agregar automaticamente eventos de vários dias. O foco está na organização base dos ficheiros e na revisão manual dos casos duvidosos.
 
+**Novo no projeto?** Começar por [`docs/WORKFLOW.md`](docs/WORKFLOW.md) —
+visão geral de todo o processo, desde as fotos no telemóvel até estarem
+visíveis no Immich, com um diagrama e uma tabela resumo de cada passo.
+
 ---
 
 ## Estrutura principal do projeto
@@ -33,6 +37,7 @@ scripts/
   build_organized_hash_index.py
 
 docs/
+  WORKFLOW.md
   GUIA_UTILIZACAO.md
   TROUBLESHOOTING.md
   CHANGELOG.md
