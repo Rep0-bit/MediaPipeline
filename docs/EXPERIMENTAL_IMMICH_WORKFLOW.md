@@ -157,17 +157,64 @@ Sem `--execute`, mostra o que faria sem copiar nada. Correr duas vezes
 seguidas com `--execute` não duplica nada (deteta ficheiros já copiados,
 tal como `apply_simple_sort.py` no workflow principal).
 
-### 5. Arrumar (manual)
+### 5. Arrumar
 
-Depois de confirmar que o export correu bem:
+Duas ações independentes, cada uma só acontece se for pedida
+explicitamente — nunca automaticamente uma por causa da outra.
 
-1. Apagar a biblioteca temporária no Immich (**Bibliotecas externas → ⋮ →
-   Eliminar**) — só remove o índice do Immich, não toca em nenhum
-   ficheiro.
-2. Remover `batches_staging/lote-2026-08/` (opcional — já não é preciso,
-   o conteúdo relevante já está em `organized_v2/`).
+**A. Limpar `batches_staging/<lote>/` (script, opt-in explícito):**
 
-Não há automação para este passo nesta primeira versão.
+```powershell
+python .\scripts\export_from_immich.py --batch-name lote-2026-08 --execute --cleanup-staging
+```
+
+`--cleanup-staging` só tem efeito junto com `--execute` (falha com erro
+claro se usada sozinha ou em dry-run — nunca apaga nada "por engano"). Só
+remove a cópia intermédia em `batches_staging/`; o resultado já exportado
+em `organized_v2/` não é tocado. Também não mexe em nada no Immich nem nos
+ficheiros de origem do lote.
+
+Se preferires fazer isto manualmente em vez de usar a flag, é seguro
+remover `batches_staging/lote-2026-08/` à mão a qualquer momento depois de
+confirmares o export.
+
+**B. Apagar a biblioteca temporária no Immich (manual, sempre):**
+
+**Bibliotecas externas → ⋮ → Eliminar.** Só remove o índice do Immich,
+nunca ficheiros. Não há forma de automatizar isto com a API key atual
+(scopes só de leitura, de propósito) — ver secção "Modo alternativo"
+abaixo para uma forma de lidar com isto sem precisar de apagar a
+biblioteca a cada lote.
+
+---
+
+## Modo alternativo: acumular vários lotes antes de exportar
+
+O fluxo acima (secção "Fluxo por lote") assume uma biblioteca nova por
+lote. Também é possível **acumular vários lotes na mesma biblioteca**,
+para ires enriquecendo os mesmos álbuns à medida que chegam fotos novas,
+e só exportar quando considerares a organização terminada:
+
+1. Corre `prepare_batch.py` para cada lote novo, com nomes diferentes
+   (`--batch-name lote1`, depois `--batch-name lote2`, ...). Cada um cria
+   a sua própria pasta `batches_staging/<lote>/for_immich/`.
+2. Na **mesma** biblioteca do Immich (criada uma vez), vai adicionando
+   cada pasta nova em **Pastas → + Adicionar** — uma biblioteca pode ter
+   várias pastas ao mesmo tempo (tal como a biblioteca principal já tem
+   `/mnt/organized`). Cura os álbuns livremente, misturando conteúdo de
+   vários lotes.
+3. Quando terminares: corre `export_from_immich.py --batch-name <lote>
+   --execute` **uma vez por cada lote** que acumulaste — o script filtra
+   corretamente pelo `manifest.jsonl` de cada um, por isso não há risco de
+   misturar ou duplicar mesmo com vários lotes na mesma biblioteca.
+4. Para "limpar" a biblioteca sem precisar de tocar no Immich (nem de
+   alargar a API key): usa `--cleanup-staging` (secção 5A) em cada lote já
+   exportado. Isto apaga as pastas locais que a biblioteca estava a
+   observar — na próxima análise (manual ou noturna), o Immich deteta que
+   os ficheiros desapareceram do disco e marca-os offline sozinho, tal
+   como aconteceu com os ficheiros de teste inválidos durante a
+   verificação inicial (ver "O que foi testado" abaixo). A biblioteca fica
+   "limpa" para a próxima ronda sem precisar de a apagar.
 
 ---
 
@@ -208,6 +255,11 @@ Não há automação para este passo nesta primeira versão.
   foram para `_GERAL/lote-2026-08-23/`. Índice de hashes cresceu
   exatamente +17 (6415 → 6432) — confirma que nada foi duplicado nem
   reprocessado.
+- **`--cleanup-staging` testado em ambiente sintético isolado**: confirmado
+  que falha com erro claro quando usada sem `--execute`; confirmado que,
+  combinada com `--execute`, remove `batches_staging/<lote>/` só depois de
+  todas as cópias terem sido feitas com sucesso, sem tocar no resultado já
+  em `organized_v2/`.
 
 ## Ficheiros deste workflow
 

@@ -129,7 +129,21 @@ def main() -> None:
     )
     parser.add_argument("--batch-name", required=True)
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument(
+        "--cleanup-staging",
+        action="store_true",
+        help="Depois de um export bem sucedido, remove batches_staging/<lote>/ "
+        "(a cópia intermédia — o resultado já está em organized_v2/). Não apaga "
+        "nada no Immich nem os ficheiros de origem do lote. Ação separada e "
+        "explícita: requer --execute na mesma chamada, nunca corre sozinha nem "
+        "por omissão.",
+    )
     args = parser.parse_args()
+
+    if args.cleanup_staging and not args.execute:
+        raise SystemExit(
+            "--cleanup-staging requer --execute (em dry-run não há nada exportado para poder limpar)."
+        )
 
     api_key = os.environ.get("IMMICH_API_KEY")
     if not api_key:
@@ -208,8 +222,18 @@ def main() -> None:
         "batch_name": args.batch_name,
         "organized_v2_root": str(config.ORGANIZED_V2_ROOT),
         "counters": dict(counters),
+        "staging_cleaned_up": False,
     }
     log_line(log_path, f"END | {json.dumps(dict(counters), ensure_ascii=False)}")
+
+    # Chegar aqui sem exceção significa que todas as cópias/registos acima
+    # foram bem sucedidos — condição mínima para ser seguro limpar o staging.
+    if args.cleanup_staging:
+        shutil.rmtree(batch_root)
+        summary["staging_cleaned_up"] = True
+        log_line(log_path, f"CLEANUP_STAGING | removido {batch_root}")
+        print(f"Limpeza: {batch_root} removido (o resultado já está em {config.ORGANIZED_V2_ROOT}).")
+
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
