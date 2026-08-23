@@ -270,3 +270,24 @@ e só exportar quando considerares a organização terminada:
   workflow principal)
 
 Nenhum ficheiro existente do workflow principal foi alterado.
+
+---
+
+## Planos futuros (ainda não construídos)
+
+- **`menu.py` — interface de terminal guiada.** Um único script com um
+  menu simples (workflow principal / preparar lote / exportar lote), sem
+  dependências novas (só biblioteca padrão). Pergunta só o que é preciso
+  (pasta, nome do lote), corre os scripts pela ordem certa, mostra os
+  resumos, e pausa de forma clara nos pontos que têm mesmo de ser manuais
+  (curadoria no Immich, revisão de `_REVIEW`). Para a opção de exportar,
+  já vai buscar `IMMICH_API_KEY` ao registo do Windows automaticamente
+  (o mesmo truque que usámos manualmente ao longo desta sessão), sem o
+  utilizador ter de o fazer à mão em cada chamada.
+  - Avaliadas e descartadas por agora: interface web (dependência nova,
+    servidor sempre ligado) e `tkinter` (não resolve o atrito real, que é
+    lembrar a ordem/flags, não a falta de botões).
+- **Gestão do ciclo de vida das bibliotecas do Immich via API**, se o
+  utilizador decidir alargar a API key com `library.read`/`library.delete`
+  — permitiria automatizar a criação/eliminação das bibliotecas
+  temporárias, hoje sempre manual.
