@@ -50,3 +50,15 @@ MULTIDAY_GPS_SUMMARY_JSON = LINKS_DIR / "multiday_gps_summary.json"
 # Used to avoid proposing a copy of a file that has already been backed up,
 # regardless of which cluster/folder it lands under on a later rescan.
 ORGANIZED_HASH_INDEX_JSONL = REGISTRY_DIR / "organized_hash_index.jsonl"
+
+# --- Experimental Immich-curated workflow (branch experiment/immich-curated-export) ---
+# See docs/EXPERIMENTAL_IMMICH_WORKFLOW.md. Both live under IMMICH_ROOT, not
+# MEDIAPIPELINE_ROOT, so they can be bind-mounted into the Immich container the
+# same way SOURCE_PHOTOS_DIR / ORGANIZED_ROOT already are.
+BATCHES_STAGING_ROOT = IMMICH_ROOT / "batches_staging"
+ORGANIZED_V2_ROOT = IMMICH_ROOT / "organized_v2"
+
+# Immich REST API base URL. The API key is intentionally NOT read here with a
+# default — scripts that need it must read IMMICH_API_KEY from the environment
+# themselves and fail clearly if it's unset. Never hardcode or log the key.
+IMMICH_API_URL = os.environ.get("IMMICH_API_URL", "http://localhost:2283/api")
