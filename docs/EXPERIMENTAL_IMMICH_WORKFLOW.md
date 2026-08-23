@@ -52,11 +52,23 @@ convenção fixa assumida pelo `export_from_immich.py` — não mudar o nome.
 No Immich: **Definições da conta → API Keys → New API Key**. Copiar a
 chave (só é mostrada uma vez).
 
-Definir como variável de ambiente (nunca escrever num ficheiro do
-repositório):
+Definir como variável de ambiente **persistente** do utilizador Windows
+(nunca escrever num ficheiro do repositório; um simples `$env:` só dura
+para a janela de terminal atual):
 
 ```powershell
-$env:IMMICH_API_KEY = "<a-tua-chave>"
+[System.Environment]::SetEnvironmentVariable("IMMICH_API_KEY", "<a-tua-chave>", "User")
+```
+
+Sessões de terminal já abertas (incluindo scripts em execução) não veem a
+variável nova até serem reiniciadas. Se estiveres a correr os scripts a
+partir de um terminal já aberto há algum tempo, ou de uma sessão que
+reutiliza o mesmo processo, o mais simples é ler o valor diretamente do
+registo no mesmo comando que precisa dele:
+
+```powershell
+$env:IMMICH_API_KEY = [System.Environment]::GetEnvironmentVariable("IMMICH_API_KEY", "User")
+python .\scripts\export_from_immich.py --batch-name lote-2026-08 --execute
 ```
 
 ---
@@ -150,11 +162,23 @@ Não há automação para este passo nesta primeira versão.
   resultado correto em cada um. Confirmada a idempotência (correr duas
   vezes com `--execute` não duplica nem re-copia). Confirmado o erro claro
   quando `IMMICH_API_KEY` não está definida.
-- **Ainda não testado**: a chamada real à API do Immich (`/albums`,
-  `/albums/{id}`) contra a instância real — requer uma API key gerada pelo
-  utilizador e, idealmente, um álbum de teste pequeno antes de usar com um
-  lote real. Fazer isso é o próximo passo antes de confiar neste workflow
-  com fotos reais.
+- **Testado também contra a instância real** (2026-08-23): biblioteca
+  temporária `teste-verificacao` apontada para `/mnt/batches_staging/...`
+  (com o bind mount novo aplicado via `docker compose up -d`), API key com
+  scopes `album.read` + `asset.read`, um álbum real criado no Immich e
+  exportado com sucesso via `export_from_immich.py --execute` — ficheiro
+  corretamente traduzido do caminho do container para o caminho local,
+  copiado para `organized_v2/<álbum>/`, e registado no índice de hashes
+  partilhado. Biblioteca e ficheiros de teste removidos depois de
+  confirmado.
+  - Nota: os primeiros ficheiros de teste usados eram JPEGs inválidos
+    (só cabeçalho, sem dados de imagem reais), o que fez a geração de
+    miniaturas do Immich falhar (`VipsJpeg: ... unexpected EOI marker`) e
+    os contadores da biblioteca mostrarem 0 — não era um problema do
+    script. Resolvido ao usar PNGs válidos. Se os contadores de
+    Fotos/Vídeos não subirem depois de "Analisar", confirmar nos logs do
+    `immich_server` (`docker logs immich_server`) se há erros de
+    `AssetGenerateThumbnails` antes de assumir que o scan falhou.
 
 ## Ficheiros deste workflow
 
