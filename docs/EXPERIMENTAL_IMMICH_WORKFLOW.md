@@ -116,6 +116,27 @@ cronológica ao navegar em `organized_v2/` no Explorer.
 Fotos que não interessa arrumar como evento ficam sem álbum — continuam a
 ser guardadas (ver abaixo), só não como evento.
 
+**Problema real encontrado no primeiro lote:** a timeline principal do
+Immich mostra a biblioteca temporária do lote misturada com toda a
+biblioteca já existente (`organized/`), por isso não dá para distinguir
+visualmente "o que é novo" a olho. Duas formas de isolar:
+
+- **Pesquisar pelo nome do ficheiro** (campo "Nome do ficheiro" na
+  pesquisa). Cuidado: em nomes de screenshot do Android
+  (`Screenshot_AAAA-MM-DD-HH-MM-SS-NN_<hash>.jpg`), o `<hash>` no fim
+  **não é único por foto** — é um identificador da app/sessão de origem,
+  partilhado por vários screenshots da mesma app ao longo do tempo.
+  Pesquisar só por esse hash traz também screenshots antigos não
+  relacionados com o lote atual.
+- **Pesquisar pelo prefixo de data/hora** (a parte `AAAA-MM-DD-HH-MM` do
+  nome) é fiável — é único ao segundo, e agrupa naturalmente screenshots
+  tirados na mesma rajada (ex.: `Screenshot_2025-01-09-14-09` apanha os 5
+  screenshots de uma sessão de ~17 segundos nesse dia).
+
+Antes de curar, vale a pena listar os ficheiros que `prepare_batch.py`
+pôs em `for_immich/` (`Get-ChildItem` ou `ls`) para teres a lista exata a
+confirmar contra o que aparece na pesquisa.
+
 ### 4. Exportar
 
 ```powershell
@@ -179,6 +200,14 @@ Não há automação para este passo nesta primeira versão.
     Fotos/Vídeos não subirem depois de "Analisar", confirmar nos logs do
     `immich_server` (`docker logs immich_server`) se há erros de
     `AssetGenerateThumbnails` antes de assumir que o scan falhou.
+- **Primeiro lote real processado com sucesso** (2026-08-23,
+  `lote-2026-08-23`): 89 ficheiros de origem, 72 já em backup (detetados
+  pelo índice de hashes partilhado, incluindo 3 fotos de documento de
+  identificação que nem chegaram a precisar do filtro de documentos), 17
+  novos preparados. Curados em 2 álbuns (2 + 5 fotos); as 10 restantes
+  foram para `_GERAL/lote-2026-08-23/`. Índice de hashes cresceu
+  exatamente +17 (6415 → 6432) — confirma que nada foi duplicado nem
+  reprocessado.
 
 ## Ficheiros deste workflow
 
