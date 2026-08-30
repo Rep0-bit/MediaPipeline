@@ -137,6 +137,43 @@ Antes de curar, vale a pena listar os ficheiros que `prepare_batch.py`
 pôs em `for_immich/` (`Get-ChildItem` ou `ls`) para teres a lista exata a
 confirmar contra o que aparece na pesquisa.
 
+### 3.5. Validar a curadoria (opcional, recomendado antes de lotes grandes)
+
+```powershell
+python .\scripts\validate_curation.py --batch-name lote-2026-08
+```
+
+Só lê a API do Immich — não altera nada em lado nenhum. Produz um
+relatório (consola + `batches_staging/<lote>/validation_report.json`)
+com quatro verificações:
+
+- **Duplicados entre álbuns**: o mesmo ficheiro em mais do que um álbum —
+  seria copiado para as duas pastas no export. Nem sempre é um erro (por
+  exemplo, ter um álbum de evento específico e também um álbum-coleção
+  mais lato pode ser intencional) — usa isto para confirmar que é mesmo o
+  que queres, não para "corrigir" tudo às cegas.
+- **Duplicados percetuais**: ficheiros diferentes que o próprio Immich já
+  identificou como semelhantes entre si (a deteção de duplicados dele),
+  sobretudo se ficaram em álbuns diferentes.
+- **Outliers de localização**: fotos cuja localização foge muito do
+  habitual do resto do álbum (ex.: uma foto tirada em Portugal dentro de
+  um álbum de uma viagem a Itália).
+- **Outliers de data**: idem, mas por data. Os limiares são propositadamente
+  pouco sensíveis para não assinalar o espalhamento normal de álbuns de
+  vários dias (ex.: 12 dias de férias) — o objetivo é apanhar desvios
+  claramente fora de série (semanas ou meses), não o normal de um álbum
+  mais longo.
+
+Testado contra um lote real de 7.315 ficheiros e ~60 álbuns já existentes:
+encontrou 125 duplicados entre álbuns (na maioria por sobreposição
+intencional com um álbum-coleção maior), 54 duplicados percetuais
+genuínos, 245 outliers de localização (incluindo uma foto tirada no Porto
+dentro de um álbum de uma viagem a Bergamo, Itália — achado real, não
+ruído) e 351 outliers de data (83% a mais de 14 dias da data típica do
+álbum — sinal provavelmente ligado a datas pouco fiáveis em exports do
+WhatsApp, o mesmo problema que o `cluster_temporal_preview.py` do
+workflow principal já lida através dos níveis de confiança).
+
 ### 4. Exportar
 
 ```powershell
@@ -264,6 +301,7 @@ e só exportar quando considerares a organização terminada:
 ## Ficheiros deste workflow
 
 - `scripts/prepare_batch.py`
+- `scripts/validate_curation.py` — só leitura, relatório opcional antes do export
 - `scripts/export_from_immich.py`
 - `scripts/config.py` — acrescenta `BATCHES_STAGING_ROOT`,
   `ORGANIZED_V2_ROOT`, `IMMICH_API_URL` (nenhum destes é usado pelo
