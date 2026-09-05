@@ -324,12 +324,29 @@ e só exportar quando considerares a organização terminada:
   dígito a mais numa data) — só detetado ao cruzar com a data EXIF real
   das fotos, não pela leitura do nome. Lição: nunca assumir que a versão
   mais recente de um nome está correta sem verificar contra os dados.
+- **Incidente real: re-export completo indesejado depois de cortar
+  `organized_v2/` para disco externo** (2026-09-05): depois de confirmado
+  que era seguro cortar o conteúdo já exportado para armazenamento externo
+  (a deduplicação é por hash de conteúdo, não por caminho, por isso mover
+  os ficheiros não quebra nada), correu-se
+  `export_from_immich.py --batch-name lote-full-2026-08-23 --execute --cleanup-staging`
+  só com intenção de limpar o staging. Como essa flag exige `--execute` no
+  mesmo comando, e `batches_staging/` ainda tinha a cópia intermédia
+  completa, o script repetiu o export inteiro (7.359 ficheiros, 0
+  saltados como "já existente", confirmado pelo log e pelas datas de
+  criação em disco) — recriando em `organized_v2/` tudo o que já tinha
+  sido cortado. Sem perda de dados (o corte para o disco externo
+  continuava intacto), mas resultado em duplicado até se confirmar e
+  apagar a cópia local recriada. Corrigido com a flag `--cleanup-only`
+  (ver secção "Interface guiada: `menu.py`" acima), que limpa sem tocar no
+  Immich nem repetir o export.
 
 ## Ficheiros deste workflow
 
 - `scripts/prepare_batch.py`
 - `scripts/validate_curation.py` — só leitura, relatório opcional antes do export
 - `scripts/export_from_immich.py`
+- `scripts/menu.py` — interface de terminal guiada (ver secção própria abaixo)
 - `scripts/config.py` — acrescenta `BATCHES_STAGING_ROOT`,
   `ORGANIZED_V2_ROOT`, `IMMICH_API_URL` (nenhum destes é usado pelo
   workflow principal)
@@ -338,20 +355,52 @@ Nenhum ficheiro existente do workflow principal foi alterado.
 
 ---
 
+## Interface guiada: `menu.py`
+
+```powershell
+python .\scripts\menu.py
+```
+
+Um único script com um menu de terminal (workflow principal / workflow
+experimental / ver estado), sem dependências novas. Pergunta só o que é
+preciso (pasta de origem, nome do lote — lembra o último usado), corre os
+scripts pela ordem certa, e pausa com instruções claras nos pontos que têm
+mesmo de ser manuais (curar no Immich, apagar a biblioteca temporária,
+rever `_REVIEW`). Para as opções que falam com o Immich, vai buscar
+`IMMICH_API_KEY` ao registo do Windows automaticamente, sem ser preciso
+defini-la à mão em cada sessão.
+
+Avaliadas e descartadas: interface web (dependência nova, servidor sempre
+ligado) e `tkinter`/GUI com botões (não resolve o atrito real, que é
+lembrar a ordem e as flags, não a falta de botões — ver também a nota
+abaixo sobre porque cada opção do menu corresponde a uma única ação).
+
+**Cada opção do menu é uma ação única e explícita — nunca duas combinadas.**
+Isto é uma lição direta de um incidente real desta sessão: pedir
+`--execute --cleanup-staging` numa única chamada (a única forma de o fazer
+antes desta correção) obrigava sempre a repetir o export inteiro antes de
+limpar, porque `--cleanup-staging` exigia `--execute` no mesmo comando. Isso
+recriou ~7300 ficheiros em `organized_v2/` que entretanto já tinham sido
+cortados para um disco externo. Corrigido com uma nova flag isolada,
+`export_from_immich.py --batch-name <lote> --cleanup-only`, que só remove
+`batches_staging/<lote>/` — não contacta o Immich, não precisa de
+`IMMICH_API_KEY` nem de `--execute`, e não repete o export. É essa flag que
+a opção "Limpar staging do lote" do menu usa; a opção "Exportar lote"
+continua separada, só com `--execute`, e o menu confirma por escrito antes
+de cada uma. A combinação antiga (`--cleanup-staging` + `--execute`)
+continua disponível para quem preferir limpar logo a seguir a um export
+feito na mesma chamada, mas deixou de ser a única forma de limpar.
+
+A opção "Limpar staging do lote" verifica primeiro se há um export
+concluído registado no log desse lote
+(`pipeline_state/logs/export_from_immich_<lote>.log`); se não encontrar,
+pede confirmação extra antes de avançar, em vez de bloquear (o log pode
+não existir por outras razões legítimas).
+
+---
+
 ## Planos futuros (ainda não construídos)
 
-- **`menu.py` — interface de terminal guiada.** Um único script com um
-  menu simples (workflow principal / preparar lote / exportar lote), sem
-  dependências novas (só biblioteca padrão). Pergunta só o que é preciso
-  (pasta, nome do lote), corre os scripts pela ordem certa, mostra os
-  resumos, e pausa de forma clara nos pontos que têm mesmo de ser manuais
-  (curadoria no Immich, revisão de `_REVIEW`). Para a opção de exportar,
-  já vai buscar `IMMICH_API_KEY` ao registo do Windows automaticamente
-  (o mesmo truque que usámos manualmente ao longo desta sessão), sem o
-  utilizador ter de o fazer à mão em cada chamada.
-  - Avaliadas e descartadas por agora: interface web (dependência nova,
-    servidor sempre ligado) e `tkinter` (não resolve o atrito real, que é
-    lembrar a ordem/flags, não a falta de botões).
 - **Gestão do ciclo de vida das bibliotecas do Immich via API**, se o
   utilizador decidir alargar a API key com `library.read`/`library.delete`
   — permitiria automatizar a criação/eliminação das bibliotecas

@@ -136,9 +136,34 @@ def main() -> None:
         "(a cópia intermédia — o resultado já está em organized_v2/). Não apaga "
         "nada no Immich nem os ficheiros de origem do lote. Ação separada e "
         "explícita: requer --execute na mesma chamada, nunca corre sozinha nem "
-        "por omissão.",
+        "por omissão. Atenção: como precisa de --execute, isto volta a correr o "
+        "export inteiro antes de limpar — se algum ficheiro já exportado tiver "
+        "sido movido/cortado de organized_v2/ entretanto, é recriado agora. Para "
+        "limpar sem repetir o export, usa --cleanup-only.",
+    )
+    parser.add_argument(
+        "--cleanup-only",
+        action="store_true",
+        help="Remove batches_staging/<lote>/ sem repetir o export — para quando "
+        "já confirmaste o resultado em organized_v2/ nalguma altura depois do "
+        "export original (nesta ou noutra sessão). Não contacta o Immich, não "
+        "precisa de IMMICH_API_KEY nem de --execute, e não se combina com "
+        "--execute nem --cleanup-staging.",
     )
     args = parser.parse_args()
+
+    if args.cleanup_only:
+        if args.execute or args.cleanup_staging:
+            raise SystemExit(
+                "--cleanup-only não se combina com --execute nem --cleanup-staging "
+                "(é uma limpeza isolada, sem repetir o export)."
+            )
+        batch_root = config.BATCHES_STAGING_ROOT / args.batch_name
+        if not batch_root.exists():
+            raise SystemExit(f"Nada para limpar — {batch_root} não existe.")
+        shutil.rmtree(batch_root)
+        print(f"Limpeza: {batch_root} removido (sem repetir o export).")
+        return
 
     if args.cleanup_staging and not args.execute:
         raise SystemExit(
