@@ -186,7 +186,7 @@ def main() -> None:
         if not relevant:
             continue  # álbum não relacionado com este lote
 
-        folder_name = safe_folder_part(album_name)
+        folder_name = safe_folder_part(album_name, preserve_spaces=True)
         dest_folder = config.ORGANIZED_V2_ROOT / folder_name
 
         for local_path in relevant:

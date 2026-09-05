@@ -184,7 +184,9 @@ Lê os álbuns via API do Immich e materializa o resultado em
 `C:\Tools\Immich\organized_v2\`:
 
 - Cada álbum → `organized_v2/<nome-do-álbum>/` (nome sanitizado para pasta
-  válida, mas de resto igual ao nome do álbum).
+  válida — espaços mantidos como espaços, só caracteres realmente
+  inválidos num nome de pasta Windows são removidos; sublinhados que já
+  fazem parte do teu próprio nome de álbum, ex. `_PBS`, `_MJ`, mantêm-se).
 - Ficheiros de `for_immich/` sem álbum → `organized_v2/_GERAL/lote-2026-08/`.
 - `documents/` → `organized_v2/_GERAL/lote-2026-08/_DOCUMENTOS/` (cópia
   direta, nunca passou pelo Immich).
@@ -193,6 +195,19 @@ Lê os álbuns via API do Immich e materializa o resultado em
 Sem `--execute`, mostra o que faria sem copiar nada. Correr duas vezes
 seguidas com `--execute` não duplica nada (deteta ficheiros já copiados,
 tal como `apply_simple_sort.py` no workflow principal).
+
+**Nota sobre nomes de pastas exportadas antes desta correção:** a primeira
+versão de `safe_folder_part()` convertia espaços em `_`, o que tornava os
+nomes das pastas de álbum menos legíveis do que deviam
+(`Férias_Algarve` em vez de `Férias Algarve`). Corrigido para preservar
+espaços. Se tiveres pastas já exportadas com a versão antiga, é seguro
+renomeá-las manualmente — só tem de se ter cuidado para não trocar
+sublinhados que já faziam parte do nome do álbum (ex. `_PBS`, `_MJ`) por
+espaços. Ao fazer essa limpeza manualmente, também vale a pena confirmar
+contra a data real das fotos (EXIF) antes de confiar num nome de álbum
+"corrigido" recentemente no Immich — descobrimos um caso em que uma
+correção de nome introduziu um erro de ano (2026 em vez de 2025) em vez de
+o corrigir, e só a data real das fotos permitiu perceber isso.
 
 ### 5. Arrumar
 
@@ -297,6 +312,18 @@ e só exportar quando considerares a organização terminada:
   combinada com `--execute`, remove `batches_staging/<lote>/` só depois de
   todas as cópias terem sido feitas com sucesso, sem tocar no resultado já
   em `organized_v2/`.
+- **Teste em escala real** (~7.364 fotos, 55 álbuns): export completo
+  confirmado em disco, no log e no índice de hashes (todos a bater em
+  7.359). Corrigido `safe_folder_part()` para preservar espaços nos nomes
+  de pastas de álbum (antes convertia tudo para `_`) — as 51 pastas com
+  data já exportadas antes desta correção foram renomeadas manualmente
+  para o formato correto, com cuidado para manter os sublinhados que já
+  eram intencionais (`_PBS`, `_MJ`, etc.) em vez de os trocar por espaços.
+  Durante essa limpeza, descobertos 4 álbuns cujo nome tinha sido editado
+  no Immich *depois* do export com um erro (ano 2026 em vez de 2025, um
+  dígito a mais numa data) — só detetado ao cruzar com a data EXIF real
+  das fotos, não pela leitura do nome. Lição: nunca assumir que a versão
+  mais recente de um nome está correta sem verificar contra os dados.
 
 ## Ficheiros deste workflow
 
