@@ -10,6 +10,10 @@ pipeline_state/
 photos/
 organized/
 
+# Experimental Immich-curated workflow (real photo data, never versioned)
+batches_staging/
+organized_v2/
+
 # Old scripts
 scripts_old/
 

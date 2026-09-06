@@ -44,14 +44,14 @@ def load_registry(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def safe_folder_part(value: str) -> str:
+def safe_folder_part(value: str, preserve_spaces: bool = False) -> str:
     allowed = []
     for ch in value:
         if ch.isalnum() or ch in ("-", "_"):
             allowed.append(ch)
         elif ch == " ":
-            allowed.append("_")
-    cleaned = "".join(allowed).strip("_")
+            allowed.append(" " if preserve_spaces else "_")
+    cleaned = "".join(allowed).strip("_ ")
     return cleaned or "unknown"
 
 
