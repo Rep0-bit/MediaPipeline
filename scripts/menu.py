@@ -105,13 +105,24 @@ def menu_producao() -> None:
         choice = input("> ").strip()
 
         if choice == "1":
+            print(
+                "\nscan_media.py lê o EXIF (ExifTool) e o hash de cada ficheiro novo em "
+                "photos/ -> cluster_temporal_preview.py agrupa por proximidade de data/hora "
+                "-> build_move_plan_preview.py decide a pasta de destino de cada cluster e "
+                "marca duplicados -> apply_simple_sort.py só mostra o plano (sem copiar)."
+            )
             run("run_pipeline.py", [])
             pause()
         elif choice == "2":
+            print("\nMesma sequência da opção 1, mas apply_simple_sort.py copia mesmo os ficheiros para organized/.")
             if ask_yes_no("Confirmas copiar ficheiros novos para organized/ agora?"):
                 run("run_pipeline.py", ["--execute"])
             pause()
         elif choice == "3":
+            print(
+                "\nprocess_review_folders.py lê as pastas dentro de _REVIEW cujo nome "
+                "termina em _A (aprovada) ou _G (geral) e copia-as para o destino final."
+            )
             if ask_yes_no("Confirmas que já reviste as pastas em _REVIEW e queres aplicar agora?"):
                 run("process_review_folders.py", ["--execute"])
             pause()
@@ -134,6 +145,13 @@ def menu_experimental() -> None:
         choice = input("> ").strip()
 
         if choice == "1":
+            print(
+                "\nprepare_batch.py lê cada foto com o ExifTool (data tirada do EXIF "
+                "DateTimeOriginal/CreateDate; se faltar, usa a data de modificação do "
+                "próprio ficheiro — nunca o nome do ficheiro) e calcula o hash SHA256 "
+                "para saber o que já está em backup, o que é duplicado dentro do lote, "
+                "e o que parece documento/print — só o resto segue para curadoria."
+            )
             source = ask("Pasta de origem")
             if not source:
                 print("Pasta de origem é obrigatória.")
@@ -163,6 +181,12 @@ def menu_experimental() -> None:
             if not ensure_immich_api_key():
                 pause()
                 continue
+            print(
+                "\nvalidate_curation.py lê os álbuns deste lote pela API do Immich e "
+                "verifica quatro coisas: a mesma foto em mais de um álbum, duplicados "
+                "percetuais (deteção própria do Immich, por semelhança visual), e fotos "
+                "cuja localização ou data destoam claramente das restantes do álbum."
+            )
             batch_name = ask_batch_name()
             run("validate_curation.py", ["--batch-name", batch_name])
             pause()
@@ -171,6 +195,11 @@ def menu_experimental() -> None:
             if not ensure_immich_api_key():
                 pause()
                 continue
+            print(
+                "\nexport_from_immich.py lê cada álbum pela API do Immich e copia as "
+                "fotos curadas para organized_v2/<nome do álbum>/ (o nome vem do álbum, "
+                "não é inventado); fotos sem álbum vão para _GERAL/<lote>/."
+            )
             batch_name = ask_batch_name()
             if ask_yes_no(f"Confirmas exportar o lote '{batch_name}' para organized_v2/ agora?"):
                 set_last_batch_name(batch_name)
